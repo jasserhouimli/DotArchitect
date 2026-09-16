@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="FieldOps.Api/FieldOps.Api.csproj" />
+  <Project Path="FieldOps.Infrastructure/FieldOps.Infrastructure.csproj" />
+  <Project Path="FieldOps.Modules.Customers/FieldOps.Modules.Customers.csproj" />
+  <Project Path="FieldOps.Modules.Identity/FieldOps.Modules.Identity.csproj" />
+  <Project Path="FieldOps.Modules.ServiceRequests/FieldOps.Modules.ServiceRequests.csproj" />
+  <Project Path="FieldOps.Modules.Technicians/FieldOps.Modules.Technicians.csproj" />
+  <Project Path="FieldOps.Modules.WorkOrders/FieldOps.Modules.WorkOrders.csproj" />
+</Solution>
