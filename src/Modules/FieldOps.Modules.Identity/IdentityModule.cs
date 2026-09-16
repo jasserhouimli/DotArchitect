@@ -6,7 +6,9 @@ using FieldOps.Modules.Identity.Domain;
 using FieldOps.Modules.Identity.Features.Register;
 using FieldOps.Modules.Identity.Features.Login;
 using FieldOps.Modules.Identity.Features.GetUser;
+using FieldOps.Modules.Identity.Features.RefreshToken;
 using FieldOps.Modules.Identity.Persistence;
+using FieldOps.Modules.Identity.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace FieldOps.Modules.Identity;
@@ -33,6 +35,7 @@ public static class IdentityModule
         .AddSignInManager<SignInManager<User>>();
 
         builder.Services.AddScoped<IdentityDbContext>();
+        builder.Services.AddScoped<TokenService>();
     }
 
     public static void MapEndpoints(WebApplication app)
@@ -40,5 +43,6 @@ public static class IdentityModule
         RegisterEndpoint.Map(app);
         LoginEndpoint.Map(app);
         GetUserEndpoint.Map(app);
+        RefreshTokenEndpoint.Map(app);
     }
 }

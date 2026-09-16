@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
 using FieldOps.Modules.Identity.Domain;
+using FieldOps.Modules.Identity.Services;
 
 namespace FieldOps.Modules.Identity.Features.Login;
 
@@ -15,10 +15,10 @@ public static class LoginEndpoint
             LoginRequest request,
             UserManager<User> userManager,
             SignInManager<User> signInManager,
-            IConfiguration config,
+            TokenService tokenService,
             CancellationToken ct) =>
         {
-            var response = await LoginHandler.Handle(request, userManager, signInManager, config, ct);
+            var response = await LoginHandler.Handle(request, userManager, signInManager, tokenService, ct);
 
             if (response is null)
                 return Results.Unauthorized();
@@ -28,10 +28,10 @@ public static class LoginEndpoint
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Lax,
-                Expires = DateTimeOffset.UtcNow.AddHours(8)
+                Expires = DateTimeOffset.UtcNow.AddHours(1)
             };
 
-            http.Response.Cookies.Append("FieldOps.Token", response.Token, cookieOptions);
+            http.Response.Cookies.Append("FieldOps.Token", response.AccessToken, cookieOptions);
 
             return Results.Ok(response);
         })

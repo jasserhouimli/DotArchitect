@@ -1,10 +1,6 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using FieldOps.Modules.Identity.Domain;
+using FieldOps.Modules.Identity.Services;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
 
 namespace FieldOps.Modules.Identity.Features.Login;
 
@@ -14,7 +10,7 @@ public static class LoginHandler
         LoginRequest request,
         UserManager<User> userManager,
         SignInManager<User> signInManager,
-        IConfiguration config,
+        TokenService tokenService,
         CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(request.Email);
@@ -27,30 +23,14 @@ public static class LoginHandler
         if (!result.Succeeded)
             return null;
 
-        var token = GenerateToken(user, config);
+        var accessToken = tokenService.GenerateAccessToken(user);
+        var refreshToken = await tokenService.GenerateRefreshTokenAsync(Guid.Parse(user.Id), ct);
 
-        return new LoginResponse(token, Guid.Parse(user.Id), user.Email!, user.FullName);
-    }
-
-    private static string GenerateToken(User user, IConfiguration config)
-    {
-        var key = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(config["Jwt:Key"] ?? throw new InvalidOperationException("JWT key not configured")));
-
-        var claims = new[]
-        {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email!),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
-
-        var token = new JwtSecurityToken(
-            issuer: config["Jwt:Issuer"],
-            audience: config["Jwt:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(8),
-            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return new LoginResponse(
+            accessToken,
+            refreshToken.Token,
+            Guid.Parse(user.Id),
+            user.Email!,
+            user.FullName);
     }
 }

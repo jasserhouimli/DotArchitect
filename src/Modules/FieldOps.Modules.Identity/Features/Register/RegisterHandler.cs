@@ -1,4 +1,5 @@
 using FieldOps.Modules.Identity.Domain;
+using FieldOps.Modules.Identity.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 
@@ -6,15 +7,16 @@ namespace FieldOps.Modules.Identity.Features.Register;
 
 public static class RegisterHandler
 {
-    public static async Task<IResult> Handle(
+    public static async Task<RegisterResponse?> Handle(
         RegisterRequest request,
         UserManager<User> userManager,
+        TokenService tokenService,
         CancellationToken ct)
     {
         var existingUser = await userManager.FindByEmailAsync(request.Email);
 
         if (existingUser is not null)
-            return Results.Conflict(new { error = "Email already registered" });
+            return null;
 
         var user = new User
         {
@@ -27,13 +29,16 @@ public static class RegisterHandler
         var result = await userManager.CreateAsync(user, request.Password);
 
         if (!result.Succeeded)
-            return Results.BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+            return null;
 
-        return Results.Created($"/users/{user.Id}", new
-        {
-            user.Id,
-            user.Email,
-            user.FullName
-        });
+        var accessToken = tokenService.GenerateAccessToken(user);
+        var refreshToken = await tokenService.GenerateRefreshTokenAsync(Guid.Parse(user.Id), ct);
+
+        return new RegisterResponse(
+            accessToken,
+            refreshToken.Token,
+            Guid.Parse(user.Id),
+            user.Email!,
+            user.FullName);
     }
 }

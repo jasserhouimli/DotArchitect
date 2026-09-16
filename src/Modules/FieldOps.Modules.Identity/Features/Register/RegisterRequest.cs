@@ -5,3 +5,11 @@ public record RegisterRequest(
     string FullName,
     string Password
 );
+
+public record RegisterResponse(
+    string AccessToken,
+    string RefreshToken,
+    Guid UserId,
+    string Email,
+    string FullName
+);

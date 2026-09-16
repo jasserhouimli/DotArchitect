@@ -8,6 +8,8 @@ public class IdentityDbContext : IdentityDbContext<User>
 {
     public IdentityDbContext(DbContextOptions<IdentityDbContext> options) : base(options) { }
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -18,6 +20,15 @@ public class IdentityDbContext : IdentityDbContext<User>
         {
             entity.ToTable("users");
             entity.Property(e => e.FullName).IsRequired().HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_tokens");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Token).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.Token).IsRequired().HasMaxLength(500);
         });
     }
 }

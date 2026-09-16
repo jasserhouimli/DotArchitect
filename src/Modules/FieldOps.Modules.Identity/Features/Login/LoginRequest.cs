@@ -6,8 +6,9 @@ public record LoginRequest(
 );
 
 public record LoginResponse(
-    string Token,
-    Guid Id,
+    string AccessToken,
+    string RefreshToken,
+    Guid UserId,
     string Email,
     string FullName
 );

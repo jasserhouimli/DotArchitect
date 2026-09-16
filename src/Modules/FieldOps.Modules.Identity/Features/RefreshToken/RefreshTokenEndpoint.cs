@@ -4,23 +4,23 @@ using Microsoft.AspNetCore.Identity;
 using FieldOps.Modules.Identity.Domain;
 using FieldOps.Modules.Identity.Services;
 
-namespace FieldOps.Modules.Identity.Features.Register;
+namespace FieldOps.Modules.Identity.Features.RefreshToken;
 
-public static class RegisterEndpoint
+public static class RefreshTokenEndpoint
 {
     public static void Map(WebApplication app)
     {
-        app.MapPost("/auth/register", async (
+        app.MapPost("/auth/refresh", async (
             HttpContext http,
-            RegisterRequest request,
+            RefreshTokenRequest request,
             UserManager<User> userManager,
             TokenService tokenService,
             CancellationToken ct) =>
         {
-            var response = await RegisterHandler.Handle(request, userManager, tokenService, ct);
+            var response = await RefreshTokenHandler.Handle(request, userManager, tokenService, ct);
 
             if (response is null)
-                return Results.Conflict(new { error = "Email already registered" });
+                return Results.Unauthorized();
 
             var cookieOptions = new CookieOptions
             {
@@ -32,10 +32,10 @@ public static class RegisterEndpoint
 
             http.Response.Cookies.Append("FieldOps.Token", response.AccessToken, cookieOptions);
 
-            return Results.Created($"/users/{response.UserId}", response);
+            return Results.Ok(response);
         })
-        .WithName("Register")
-        .Produces(201)
-        .Produces(409);
+        .WithName("RefreshToken")
+        .Produces(200)
+        .Produces(401);
     }
 }
