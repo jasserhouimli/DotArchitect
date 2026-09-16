@@ -2,7 +2,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using FieldOps.Modules.Identity.Domain;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -11,7 +10,7 @@ namespace FieldOps.Modules.Identity.Features.Login;
 
 public static class LoginHandler
 {
-    public static async Task<IResult> Handle(
+    public static async Task<LoginResponse?> Handle(
         LoginRequest request,
         UserManager<User> userManager,
         SignInManager<User> signInManager,
@@ -21,22 +20,16 @@ public static class LoginHandler
         var user = await userManager.FindByEmailAsync(request.Email);
 
         if (user is null)
-            return Results.Unauthorized();
+            return null;
 
         var result = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
 
         if (!result.Succeeded)
-            return Results.Unauthorized();
+            return null;
 
         var token = GenerateToken(user, config);
 
-        return Results.Ok(new
-        {
-            token,
-            user.Id,
-            user.Email,
-            user.FullName
-        });
+        return new LoginResponse(token, Guid.Parse(user.Id), user.Email!, user.FullName);
     }
 
     private static string GenerateToken(User user, IConfiguration config)
