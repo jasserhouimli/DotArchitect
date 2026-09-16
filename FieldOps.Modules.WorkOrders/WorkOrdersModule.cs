@@ -1,4 +1,8 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using FieldOps.Modules.WorkOrders.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace FieldOps.Modules.WorkOrders;
 
@@ -6,6 +10,11 @@ public static class WorkOrdersModule
 {
     public static void Register(WebApplicationBuilder builder)
     {
-        // Add WorkOrders services here
+        var connectionString = builder.Configuration.GetConnectionString("WorkOrders");
+
+        builder.Services.AddDbContext<WorkOrdersDbContext>(options =>
+            options.UseNpgsql(connectionString));
+
+        builder.Services.AddScoped<WorkOrdersDbContext>();
     }
 }
