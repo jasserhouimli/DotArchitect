@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using FieldOps.Modules.Identity.Persistence;
+using Microsoft.AspNetCore.Identity;
+using FieldOps.Modules.Identity.Domain;
 
 namespace FieldOps.Modules.Identity.Features.Register;
 
@@ -10,10 +11,10 @@ public static class RegisterEndpoint
     {
         app.MapPost("/auth/register", async (
             RegisterRequest request,
-            IdentityDbContext db,
+            UserManager<User> userManager,
             CancellationToken ct) =>
         {
-            return await RegisterHandler.Handle(request, db, ct);
+            return await RegisterHandler.Handle(request, userManager, ct);
         })
         .WithName("Register")
         .Produces(201)

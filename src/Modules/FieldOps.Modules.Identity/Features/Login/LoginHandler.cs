@@ -2,9 +2,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using FieldOps.Modules.Identity.Domain;
-using FieldOps.Modules.Identity.Persistence;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
@@ -14,13 +13,19 @@ public static class LoginHandler
 {
     public static async Task<IResult> Handle(
         LoginRequest request,
-        IdentityDbContext db,
+        UserManager<User> userManager,
+        SignInManager<User> signInManager,
         IConfiguration config,
         CancellationToken ct)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == request.Email, ct);
+        var user = await userManager.FindByEmailAsync(request.Email);
 
-        if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (user is null)
+            return Results.Unauthorized();
+
+        var result = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
+
+        if (!result.Succeeded)
             return Results.Unauthorized();
 
         var token = GenerateToken(user, config);
@@ -30,8 +35,7 @@ public static class LoginHandler
             token,
             user.Id,
             user.Email,
-            user.FullName,
-            user.Role
+            user.FullName
         });
     }
 
@@ -43,8 +47,7 @@ public static class LoginHandler
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role),
+            new Claim(JwtRegisteredClaimNames.Email, user.Email!),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

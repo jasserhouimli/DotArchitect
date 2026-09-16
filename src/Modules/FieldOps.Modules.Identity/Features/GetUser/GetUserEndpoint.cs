@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using FieldOps.Modules.Identity.Persistence;
+using Microsoft.AspNetCore.Identity;
+using FieldOps.Modules.Identity.Domain;
 
 namespace FieldOps.Modules.Identity.Features.GetUser;
 
@@ -10,10 +11,10 @@ public static class GetUserEndpoint
     {
         app.MapGet("/users/{id:guid}", async (
             Guid id,
-            IdentityDbContext db,
+            UserManager<User> userManager,
             CancellationToken ct) =>
         {
-            return await GetUserHandler.Handle(new GetUserQuery(id), db, ct);
+            return await GetUserHandler.Handle(new GetUserQuery(id), userManager, ct);
         })
         .WithName("GetUser")
         .Produces(200)

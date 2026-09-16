@@ -1,6 +1,6 @@
-using FieldOps.Modules.Identity.Persistence;
+using FieldOps.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 
 namespace FieldOps.Modules.Identity.Features.GetUser;
 
@@ -8,24 +8,20 @@ public static class GetUserHandler
 {
     public static async Task<IResult> Handle(
         GetUserQuery query,
-        IdentityDbContext db,
+        UserManager<User> userManager,
         CancellationToken ct)
     {
-        var user = await db.Users
-            .Where(u => u.Id == query.Id)
-            .Select(u => new
-            {
-                u.Id,
-                u.Email,
-                u.FullName,
-                u.Role,
-                u.CreatedAt
-            })
-            .FirstOrDefaultAsync(ct);
+        var user = await userManager.FindByIdAsync(query.Id.ToString());
 
         if (user is null)
             return Results.NotFound();
 
-        return Results.Ok(user);
+        return Results.Ok(new
+        {
+            user.Id,
+            user.Email,
+            user.FullName,
+            user.CreatedAt
+        });
     }
 }

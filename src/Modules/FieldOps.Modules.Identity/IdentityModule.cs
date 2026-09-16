@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FieldOps.Modules.Identity.Domain;
 using FieldOps.Modules.Identity.Features.Register;
 using FieldOps.Modules.Identity.Features.Login;
 using FieldOps.Modules.Identity.Features.GetUser;
@@ -17,6 +19,18 @@ public static class IdentityModule
 
         builder.Services.AddDbContext<IdentityDbContext>(options =>
             options.UseNpgsql(connectionString));
+
+        builder.Services.AddIdentityCore<User>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequiredLength = 8;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireLowercase = true;
+            options.User.RequireUniqueEmail = true;
+        })
+        .AddEntityFrameworkStores<IdentityDbContext>()
+        .AddSignInManager<SignInManager<User>>();
 
         builder.Services.AddScoped<IdentityDbContext>();
     }
