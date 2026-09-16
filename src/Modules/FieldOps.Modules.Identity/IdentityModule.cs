@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
@@ -6,6 +7,7 @@ using FieldOps.Modules.Identity.Domain;
 using FieldOps.Modules.Identity.Features.Register;
 using FieldOps.Modules.Identity.Features.Login;
 using FieldOps.Modules.Identity.Features.GetUser;
+using FieldOps.Modules.Identity.Features.Logout;
 using FieldOps.Modules.Identity.Features.RefreshToken;
 using FieldOps.Modules.Identity.Persistence;
 using FieldOps.Modules.Identity.Services;
@@ -34,6 +36,7 @@ public static class IdentityModule
         .AddEntityFrameworkStores<IdentityDbContext>()
         .AddSignInManager<SignInManager<User>>();
 
+        builder.Services.AddValidatorsFromAssemblyContaining<IdentityDbContext>();
         builder.Services.AddScoped<IdentityDbContext>();
         builder.Services.AddScoped<TokenService>();
     }
@@ -44,5 +47,6 @@ public static class IdentityModule
         LoginEndpoint.Map(app);
         GetUserEndpoint.Map(app);
         RefreshTokenEndpoint.Map(app);
+        LogoutEndpoint.Map(app);
     }
 }
