@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using FieldOps.Modules.Identity.Features.Register;
 using FieldOps.Modules.Identity.Features.Login;
+using FieldOps.Modules.Identity.Features.GetUser;
 using FieldOps.Modules.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,5 +25,6 @@ public static class IdentityModule
     {
         RegisterEndpoint.Map(app);
         LoginEndpoint.Map(app);
+        GetUserEndpoint.Map(app);
     }
 }
