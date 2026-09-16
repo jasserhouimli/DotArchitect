@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FieldOps.Modules.Identity.Features.Register;
+using FieldOps.Modules.Identity.Features.Login;
 using FieldOps.Modules.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,5 +18,11 @@ public static class IdentityModule
             options.UseNpgsql(connectionString));
 
         builder.Services.AddScoped<IdentityDbContext>();
+    }
+
+    public static void MapEndpoints(WebApplication app)
+    {
+        RegisterEndpoint.Map(app);
+        LoginEndpoint.Map(app);
     }
 }

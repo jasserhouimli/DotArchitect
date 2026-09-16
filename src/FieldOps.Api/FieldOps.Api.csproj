@@ -13,10 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Modules\FieldOps.Modules.Identity\FieldOps.Modules.Identity.csproj" />
-    <ProjectReference Include="..\Modules\FieldOps.Modules.Customers\FieldOps.Modules.Customers.csproj" />
-    <ProjectReference Include="..\Modules\FieldOps.Modules.Technicians\FieldOps.Modules.Technicians.csproj" />
-    <ProjectReference Include="..\Modules\FieldOps.Modules.ServiceRequests\FieldOps.Modules.ServiceRequests.csproj" />
-    <ProjectReference Include="..\Modules\FieldOps.Modules.WorkOrders\FieldOps.Modules.WorkOrders.csproj" />
     <ProjectReference Include="..\FieldOps.Infrastructure\FieldOps.Infrastructure.csproj" />
   </ItemGroup>
 
