@@ -10,7 +10,7 @@ public static class ServiceRequestsModule
 {
     public static void Register(WebApplicationBuilder builder)
     {
-        var connectionString = builder.Configuration.GetConnectionString("ServiceRequests");
+        var connectionString = builder.Configuration.GetConnectionString("FieldOps");
 
         builder.Services.AddDbContext<ServiceRequestsDbContext>(options =>
             options.UseNpgsql(connectionString));

@@ -11,8 +11,11 @@ public class CustomersDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema("customers");
+
         modelBuilder.Entity<Customer>(entity =>
         {
+            entity.ToTable("customers");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Email).IsUnique();
             entity.Property(e => e.Name).IsRequired().HasMaxLength(256);

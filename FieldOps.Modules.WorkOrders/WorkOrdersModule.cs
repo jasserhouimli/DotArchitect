@@ -10,7 +10,7 @@ public static class WorkOrdersModule
 {
     public static void Register(WebApplicationBuilder builder)
     {
-        var connectionString = builder.Configuration.GetConnectionString("WorkOrders");
+        var connectionString = builder.Configuration.GetConnectionString("FieldOps");
 
         builder.Services.AddDbContext<WorkOrdersDbContext>(options =>
             options.UseNpgsql(connectionString));

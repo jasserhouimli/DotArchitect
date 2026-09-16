@@ -11,8 +11,11 @@ public class TechniciansDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema("technicians");
+
         modelBuilder.Entity<Technician>(entity =>
         {
+            entity.ToTable("technicians");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.FullName).IsRequired().HasMaxLength(256);
             entity.Property(e => e.Email).IsRequired().HasMaxLength(256);

@@ -11,8 +11,11 @@ public class ServiceRequestsDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema("service_requests");
+
         modelBuilder.Entity<ServiceRequest>(entity =>
         {
+            entity.ToTable("service_requests");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Title).IsRequired().HasMaxLength(256);
             entity.Property(e => e.Description).HasMaxLength(2000);

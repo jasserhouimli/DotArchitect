@@ -10,7 +10,7 @@ public static class TechniciansModule
 {
     public static void Register(WebApplicationBuilder builder)
     {
-        var connectionString = builder.Configuration.GetConnectionString("Technicians");
+        var connectionString = builder.Configuration.GetConnectionString("FieldOps");
 
         builder.Services.AddDbContext<TechniciansDbContext>(options =>
             options.UseNpgsql(connectionString));

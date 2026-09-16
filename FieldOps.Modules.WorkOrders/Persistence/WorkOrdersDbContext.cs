@@ -11,8 +11,11 @@ public class WorkOrdersDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema("work_orders");
+
         modelBuilder.Entity<WorkOrder>(entity =>
         {
+            entity.ToTable("work_orders");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Title).IsRequired().HasMaxLength(256);
             entity.Property(e => e.Description).HasMaxLength(2000);

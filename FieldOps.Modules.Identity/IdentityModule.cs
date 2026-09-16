@@ -10,7 +10,7 @@ public static class IdentityModule
 {
     public static void Register(WebApplicationBuilder builder)
     {
-        var connectionString = builder.Configuration.GetConnectionString("Identity");
+        var connectionString = builder.Configuration.GetConnectionString("FieldOps");
 
         builder.Services.AddDbContext<IdentityDbContext>(options =>
             options.UseNpgsql(connectionString));
