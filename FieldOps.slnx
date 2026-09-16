@@ -1,9 +1,9 @@
 <Solution>
   <Project Path="src/FieldOps.Api/FieldOps.Api.csproj" />
   <Project Path="src/FieldOps.Infrastructure/FieldOps.Infrastructure.csproj" />
-  <Project Path="src/FieldOps.Modules.Customers/FieldOps.Modules.Customers.csproj" />
-  <Project Path="src/FieldOps.Modules.Identity/FieldOps.Modules.Identity.csproj" />
-  <Project Path="src/FieldOps.Modules.ServiceRequests/FieldOps.Modules.ServiceRequests.csproj" />
-  <Project Path="src/FieldOps.Modules.Technicians/FieldOps.Modules.Technicians.csproj" />
-  <Project Path="src/FieldOps.Modules.WorkOrders/FieldOps.Modules.WorkOrders.csproj" />
+  <Project Path="src/Modules/FieldOps.Modules.Customers/FieldOps.Modules.Customers.csproj" />
+  <Project Path="src/Modules/FieldOps.Modules.Identity/FieldOps.Modules.Identity.csproj" />
+  <Project Path="src/Modules/FieldOps.Modules.ServiceRequests/FieldOps.Modules.ServiceRequests.csproj" />
+  <Project Path="src/Modules/FieldOps.Modules.Technicians/FieldOps.Modules.Technicians.csproj" />
+  <Project Path="src/Modules/FieldOps.Modules.WorkOrders/FieldOps.Modules.WorkOrders.csproj" />
 </Solution>
