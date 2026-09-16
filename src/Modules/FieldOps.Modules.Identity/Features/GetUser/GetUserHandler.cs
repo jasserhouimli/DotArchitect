@@ -1,12 +1,12 @@
+using FieldOps.Infrastructure.Results;
 using FieldOps.Modules.Identity.Domain;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 
 namespace FieldOps.Modules.Identity.Features.GetUser;
 
 public static class GetUserHandler
 {
-    public static async Task<IResult> Handle(
+    public static async Task<Result<GetUserResponse>> Handle(
         GetUserQuery query,
         UserManager<User> userManager,
         CancellationToken ct)
@@ -14,14 +14,19 @@ public static class GetUserHandler
         var user = await userManager.FindByIdAsync(query.Id.ToString());
 
         if (user is null)
-            return Results.NotFound();
+            return Result<GetUserResponse>.Failure("User not found", 404);
 
-        return Results.Ok(new
-        {
+        return Result<GetUserResponse>.Success(new GetUserResponse(
             user.Id,
-            user.Email,
+            user.Email!,
             user.FullName,
-            user.CreatedAt
-        });
+            user.CreatedAt));
     }
 }
+
+public record GetUserResponse(
+    string Id,
+    string Email,
+    string FullName,
+    DateTime CreatedAt
+);

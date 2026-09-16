@@ -17,10 +17,10 @@ public static class RefreshTokenEndpoint
             TokenService tokenService,
             CancellationToken ct) =>
         {
-            var response = await RefreshTokenHandler.Handle(request, userManager, tokenService, ct);
+            var result = await RefreshTokenHandler.Handle(request, userManager, tokenService, ct);
 
-            if (response is null)
-                return Results.Unauthorized();
+            if (!result.IsSuccess)
+                return Results.Json(new { error = result.Error }, statusCode: result.StatusCode);
 
             var cookieOptions = new CookieOptions
             {
@@ -30,9 +30,9 @@ public static class RefreshTokenEndpoint
                 Expires = DateTimeOffset.UtcNow.AddHours(1)
             };
 
-            http.Response.Cookies.Append("FieldOps.Token", response.AccessToken, cookieOptions);
+            http.Response.Cookies.Append("FieldOps.Token", result.Value!.AccessToken, cookieOptions);
 
-            return Results.Ok(response);
+            return Results.Ok(result.Value);
         })
         .WithName("RefreshToken")
         .Produces(200)

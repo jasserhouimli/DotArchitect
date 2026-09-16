@@ -14,7 +14,12 @@ public static class LogoutEndpoint
             TokenService tokenService,
             CancellationToken ct) =>
         {
-            return await LogoutHandler.Handle(request, tokenService, http, ct);
+            var result = await LogoutHandler.Handle(request, tokenService, http, ct);
+
+            if (!result.IsSuccess)
+                return Results.Json(new { error = result.Error }, statusCode: result.StatusCode);
+
+            return Results.Ok(result.Value);
         })
         .WithName("Logout")
         .Produces(200);

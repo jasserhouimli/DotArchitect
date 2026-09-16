@@ -1,3 +1,4 @@
+using FieldOps.Infrastructure.Results;
 using FieldOps.Modules.Identity.Services;
 using Microsoft.AspNetCore.Http;
 
@@ -5,7 +6,7 @@ namespace FieldOps.Modules.Identity.Features.Logout;
 
 public static class LogoutHandler
 {
-    public static async Task<IResult> Handle(
+    public static async Task<Result<LogoutResponse>> Handle(
         LogoutRequest request,
         TokenService tokenService,
         HttpContext http,
@@ -15,6 +16,8 @@ public static class LogoutHandler
 
         http.Response.Cookies.Delete("FieldOps.Token");
 
-        return Results.Ok(new { message = "Logged out successfully" });
+        return Result<LogoutResponse>.Success(new LogoutResponse("Logged out successfully"));
     }
 }
+
+public record LogoutResponse(string Message);

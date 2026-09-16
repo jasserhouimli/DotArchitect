@@ -17,10 +17,10 @@ public static class RegisterEndpoint
             TokenService tokenService,
             CancellationToken ct) =>
         {
-            var response = await RegisterHandler.Handle(request, userManager, tokenService, ct);
+            var result = await RegisterHandler.Handle(request, userManager, tokenService, ct);
 
-            if (response is null)
-                return Results.Conflict(new { error = "Email already registered" });
+            if (!result.IsSuccess)
+                return Results.Json(new { error = result.Error }, statusCode: result.StatusCode);
 
             var cookieOptions = new CookieOptions
             {
@@ -30,9 +30,9 @@ public static class RegisterEndpoint
                 Expires = DateTimeOffset.UtcNow.AddHours(1)
             };
 
-            http.Response.Cookies.Append("FieldOps.Token", response.AccessToken, cookieOptions);
+            http.Response.Cookies.Append("FieldOps.Token", result.Value!.AccessToken, cookieOptions);
 
-            return Results.Created($"/users/{response.UserId}", response);
+            return Results.Json(result.Value, statusCode: result.StatusCode);
         })
         .WithName("Register")
         .Produces(201)

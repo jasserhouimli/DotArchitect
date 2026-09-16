@@ -15,7 +15,12 @@ public static class GetUserEndpoint
             UserManager<User> userManager,
             CancellationToken ct) =>
         {
-            return await GetUserHandler.Handle(new GetUserQuery(id), userManager, ct);
+            var result = await GetUserHandler.Handle(new GetUserQuery(id), userManager, ct);
+
+            if (!result.IsSuccess)
+                return Results.Json(new { error = result.Error }, statusCode: result.StatusCode);
+
+            return Results.Ok(result.Value);
         })
         .WithName("GetUser")
         .RequireAuthorization()
