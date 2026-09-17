@@ -1,6 +1,5 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,6 +39,12 @@ public static class IdentityModule
         builder.Services.AddValidatorsFromAssemblyContaining<IdentityDbContext>();
         builder.Services.AddScoped<IdentityDbContext>();
         builder.Services.AddScoped<TokenService>();
+
+        builder.Services.AddScoped<RegisterHandler>();
+        builder.Services.AddScoped<LoginHandler>();
+        builder.Services.AddScoped<GetUserHandler>();
+        builder.Services.AddScoped<RefreshTokenHandler>();
+        builder.Services.AddScoped<LogoutHandler>();
     }
 
     public static void MapEndpoints(WebApplication app)

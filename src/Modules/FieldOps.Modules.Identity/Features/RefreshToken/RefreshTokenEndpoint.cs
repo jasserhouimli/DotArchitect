@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
-using FieldOps.Modules.Identity.Domain;
-using FieldOps.Modules.Identity.Services;
 
 namespace FieldOps.Modules.Identity.Features.RefreshToken;
 
@@ -13,8 +10,7 @@ public static class RefreshTokenEndpoint
     {
         app.MapPost("/auth/refresh", async (
             HttpContext http,
-            UserManager<User> userManager,
-            TokenService tokenService,
+            RefreshTokenHandler handler,
             CancellationToken ct) =>
         {
             http.Request.Cookies.TryGetValue("FieldOps.RefreshToken", out var refreshToken);
@@ -22,7 +18,7 @@ public static class RefreshTokenEndpoint
             if (string.IsNullOrEmpty(refreshToken))
                 return Results.Json(new { error = "Refresh token not found" }, statusCode: 401);
 
-            var result = await RefreshTokenHandler.Handle(new RefreshTokenRequest(refreshToken), userManager, tokenService, ct);
+            var result = await handler.Handle(new RefreshTokenRequest(refreshToken), ct);
 
             if (!result.IsSuccess)
                 return Results.Json(new { error = result.Error }, statusCode: result.StatusCode);

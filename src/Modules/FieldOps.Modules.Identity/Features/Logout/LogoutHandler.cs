@@ -4,11 +4,10 @@ using Microsoft.AspNetCore.Http;
 
 namespace FieldOps.Modules.Identity.Features.Logout;
 
-public static class LogoutHandler
+public class LogoutHandler(TokenService tokenService)
 {
-    public static async Task<Result<LogoutResponse>> Handle(
+    public async Task<Result<LogoutResponse>> Handle(
         LogoutRequest request,
-        TokenService tokenService,
         HttpContext http,
         CancellationToken ct)
     {

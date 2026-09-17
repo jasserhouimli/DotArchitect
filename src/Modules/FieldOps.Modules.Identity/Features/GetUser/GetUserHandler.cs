@@ -4,11 +4,10 @@ using Microsoft.AspNetCore.Identity;
 
 namespace FieldOps.Modules.Identity.Features.GetUser;
 
-public static class GetUserHandler
+public class GetUserHandler(UserManager<User> userManager)
 {
-    public static async Task<Result<GetUserResponse>> Handle(
+    public async Task<Result<GetUserResponse>> Handle(
         GetUserQuery query,
-        UserManager<User> userManager,
         CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(query.Id.ToString());

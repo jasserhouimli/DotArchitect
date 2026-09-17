@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
-using FieldOps.Modules.Identity.Domain;
-using FieldOps.Modules.Identity.Services;
 
 namespace FieldOps.Modules.Identity.Features.Login;
 
@@ -13,13 +10,11 @@ public static class LoginEndpoint
     {
         app.MapPost("/auth/login", async (
             HttpContext http,
+            LoginHandler handler,
             LoginRequest request,
-            UserManager<User> userManager,
-            SignInManager<User> signInManager,
-            TokenService tokenService,
             CancellationToken ct) =>
         {
-            var result = await LoginHandler.Handle(request, userManager, signInManager, tokenService, ct);
+            var result = await handler.Handle(request, ct);
 
             if (!result.IsSuccess)
                 return Results.Json(new { error = result.Error }, statusCode: result.StatusCode);

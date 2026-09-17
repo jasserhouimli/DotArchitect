@@ -5,13 +5,13 @@ using Microsoft.AspNetCore.Identity;
 
 namespace FieldOps.Modules.Identity.Features.Login;
 
-public static class LoginHandler
+public class LoginHandler(
+    UserManager<User> userManager,
+    SignInManager<User> signInManager,
+    TokenService tokenService)
 {
-    public static async Task<Result<LoginResponse>> Handle(
+    public async Task<Result<LoginResponse>> Handle(
         LoginRequest request,
-        UserManager<User> userManager,
-        SignInManager<User> signInManager,
-        TokenService tokenService,
         CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(request.Email);

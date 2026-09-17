@@ -4,11 +4,10 @@ using Microsoft.AspNetCore.Identity;
 
 namespace FieldOps.Modules.Identity.Features.Register;
 
-public static class RegisterHandler
+public class RegisterHandler(UserManager<User> userManager)
 {
-    public static async Task<Result<RegisterResponse>> Handle(
+    public async Task<Result<RegisterResponse>> Handle(
         RegisterRequest request,
-        UserManager<User> userManager,
         CancellationToken ct)
     {
         var existingUser = await userManager.FindByEmailAsync(request.Email);

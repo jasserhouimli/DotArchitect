@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
-using FieldOps.Modules.Identity.Services;
 
 namespace FieldOps.Modules.Identity.Features.Logout;
 
@@ -11,13 +10,15 @@ public static class LogoutEndpoint
     {
         app.MapPost("/auth/logout", async (
             HttpContext http,
-            TokenService tokenService,
+            LogoutHandler handler,
             CancellationToken ct) =>
         {
             http.Request.Cookies.TryGetValue("FieldOps.RefreshToken", out var refreshToken);
 
-            if (!string.IsNullOrEmpty(refreshToken))
-                await tokenService.RevokeRefreshTokenAsync(refreshToken, ct);
+            if (string.IsNullOrEmpty(refreshToken))
+                return Results.Ok(new { message = "Logged out successfully" });
+
+            var result = await handler.Handle(new LogoutRequest(refreshToken), http, ct);
 
             http.Response.Cookies.Delete("FieldOps.Token");
             http.Response.Cookies.Delete("FieldOps.RefreshToken");

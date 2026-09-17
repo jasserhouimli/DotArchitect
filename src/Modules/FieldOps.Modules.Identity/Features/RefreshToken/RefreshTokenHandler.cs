@@ -5,12 +5,12 @@ using Microsoft.AspNetCore.Identity;
 
 namespace FieldOps.Modules.Identity.Features.RefreshToken;
 
-public static class RefreshTokenHandler
+public class RefreshTokenHandler(
+    UserManager<User> userManager,
+    TokenService tokenService)
 {
-    public static async Task<Result<RefreshTokenResponse>> Handle(
+    public async Task<Result<RefreshTokenResponse>> Handle(
         RefreshTokenRequest request,
-        UserManager<User> userManager,
-        TokenService tokenService,
         CancellationToken ct)
     {
         var storedToken = await tokenService.ValidateRefreshTokenAsync(request.RefreshToken, ct);
