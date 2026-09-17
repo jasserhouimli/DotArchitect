@@ -23,7 +23,7 @@ public static class LoginEndpoint
             if (!result.IsSuccess)
                 return Results.Json(new { error = result.Error }, statusCode: result.StatusCode);
 
-            var cookieOptions = new CookieOptions
+            var accessCookieOptions = new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
@@ -31,9 +31,19 @@ public static class LoginEndpoint
                 Expires = DateTimeOffset.UtcNow.AddHours(1)
             };
 
-            http.Response.Cookies.Append("FieldOps.Token", result.Value!.AccessToken, cookieOptions);
+            var refreshCookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Lax,
+                Expires = DateTimeOffset.UtcNow.AddDays(7),
+                Path = "/auth/refresh"
+            };
 
-            return Results.Ok(result.Value);
+            http.Response.Cookies.Append("FieldOps.Token", result.Value!.AccessToken, accessCookieOptions);
+            http.Response.Cookies.Append("FieldOps.RefreshToken", result.Value.RefreshToken, refreshCookieOptions);
+
+            return Results.Ok(new { result.Value.UserId, result.Value.Email, result.Value.FullName });
         })
         .WithName("Login")
         .Produces(200)

@@ -10,16 +10,18 @@ public static class LogoutEndpoint
     {
         app.MapPost("/auth/logout", async (
             HttpContext http,
-            LogoutRequest request,
             TokenService tokenService,
             CancellationToken ct) =>
         {
-            var result = await LogoutHandler.Handle(request, tokenService, http, ct);
+            http.Request.Cookies.TryGetValue("FieldOps.RefreshToken", out var refreshToken);
 
-            if (!result.IsSuccess)
-                return Results.Json(new { error = result.Error }, statusCode: result.StatusCode);
+            if (!string.IsNullOrEmpty(refreshToken))
+                await tokenService.RevokeRefreshTokenAsync(refreshToken, ct);
 
-            return Results.Ok(result.Value);
+            http.Response.Cookies.Delete("FieldOps.Token");
+            http.Response.Cookies.Delete("FieldOps.RefreshToken");
+
+            return Results.Ok(new { message = "Logged out successfully" });
         })
         .WithName("Logout")
         .Produces(200);
