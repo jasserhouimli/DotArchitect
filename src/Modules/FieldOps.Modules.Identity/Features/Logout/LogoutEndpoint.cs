@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using FieldOps.Modules.Identity.Services;
 
 namespace FieldOps.Modules.Identity.Features.Logout;
@@ -24,6 +25,7 @@ public static class LogoutEndpoint
             return Results.Ok(new { message = "Logged out successfully" });
         })
         .WithName("Logout")
+        .RequireRateLimiting("auth")
         .Produces(200);
     }
 }

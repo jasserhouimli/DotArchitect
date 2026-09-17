@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using FieldOps.Modules.Identity.Domain;
 using FieldOps.Modules.Identity.Services;
 
@@ -49,6 +50,7 @@ public static class RefreshTokenEndpoint
             return Results.Ok(result.Value);
         })
         .WithName("RefreshToken")
+        .RequireRateLimiting("auth")
         .Produces(200)
         .Produces(401);
     }

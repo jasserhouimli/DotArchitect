@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using FieldOps.Modules.Identity.Domain;
 
 namespace FieldOps.Modules.Identity.Features.Register;
@@ -23,6 +24,7 @@ public static class RegisterEndpoint
             return Results.Json(result.Value, statusCode: result.StatusCode);
         })
         .WithName("Register")
+        .RequireRateLimiting("auth")
         .Produces(201)
         .Produces(409);
     }
