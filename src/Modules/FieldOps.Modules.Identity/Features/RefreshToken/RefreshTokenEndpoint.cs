@@ -46,7 +46,7 @@ public static class RefreshTokenEndpoint
             http.Response.Cookies.Append("FieldOps.Token", result.Value!.AccessToken, accessCookieOptions);
             http.Response.Cookies.Append("FieldOps.RefreshToken", result.Value.RefreshToken, refreshCookieOptions);
 
-            return Results.Ok(new { message = "Tokens refreshed" });
+            return Results.Ok(result.Value);
         })
         .WithName("RefreshToken")
         .Produces(200)

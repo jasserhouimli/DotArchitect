@@ -43,7 +43,7 @@ public static class LoginEndpoint
             http.Response.Cookies.Append("FieldOps.Token", result.Value!.AccessToken, accessCookieOptions);
             http.Response.Cookies.Append("FieldOps.RefreshToken", result.Value.RefreshToken, refreshCookieOptions);
 
-            return Results.Ok(new { result.Value.UserId, result.Value.Email, result.Value.FullName });
+            return Results.Ok(result.Value);
         })
         .WithName("Login")
         .Produces(200)
