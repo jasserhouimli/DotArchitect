@@ -21,7 +21,7 @@ public class TokenService
         _db = db;
     }
 
-    public string GenerateAccessToken(User user)
+    public virtual string GenerateAccessToken(User user)
     {
         var key = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
@@ -45,7 +45,7 @@ public class TokenService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    public async Task<RefreshToken> GenerateRefreshTokenAsync(Guid userId, CancellationToken ct)
+    public virtual async Task<RefreshToken> GenerateRefreshTokenAsync(Guid userId, CancellationToken ct)
     {
         var expirationDays = int.Parse(_config["Jwt:RefreshTokenExpirationDays"] ?? "7");
 
@@ -64,7 +64,7 @@ public class TokenService
         return refreshToken;
     }
 
-    public async Task<RefreshToken?> ValidateRefreshTokenAsync(string token, CancellationToken ct)
+    public virtual async Task<RefreshToken?> ValidateRefreshTokenAsync(string token, CancellationToken ct)
     {
         var refreshToken = await _db.RefreshTokens
             .FirstOrDefaultAsync(rt => rt.Token == token, ct);
@@ -75,7 +75,7 @@ public class TokenService
         return refreshToken;
     }
 
-    public async Task RevokeRefreshTokenAsync(string token, CancellationToken ct)
+    public virtual async Task RevokeRefreshTokenAsync(string token, CancellationToken ct)
     {
         var refreshToken = await _db.RefreshTokens
             .FirstOrDefaultAsync(rt => rt.Token == token, ct);
