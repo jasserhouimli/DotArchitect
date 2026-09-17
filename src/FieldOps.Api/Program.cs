@@ -2,6 +2,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using FieldOps.Infrastructure.Middleware;
 using FieldOps.Modules.Identity;
+using FieldOps.Modules.Customers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -19,6 +20,7 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 IdentityModule.Register(builder);
+CustomersModule.Register(builder);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -119,6 +121,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 IdentityModule.MapEndpoints(app);
+CustomersModule.MapEndpoints(app);
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 

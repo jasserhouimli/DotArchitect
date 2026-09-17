@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Modules\FieldOps.Modules.Identity\FieldOps.Modules.Identity.csproj" />
     <ProjectReference Include="..\FieldOps.Infrastructure\FieldOps.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\FieldOps.Modules.Customers\FieldOps.Modules.Customers.csproj" />
   </ItemGroup>
 
 </Project>
