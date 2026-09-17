@@ -4,6 +4,10 @@ using FieldOps.Infrastructure.Middleware;
 using FieldOps.Modules.Identity;
 using FieldOps.Modules.Customers;
 using FieldOps.Modules.Technicians;
+using FieldOps.Modules.WorkOrders;
+using FieldOps.Modules.Inventory;
+using FieldOps.Modules.Scheduling;
+using FieldOps.Modules.Invoicing;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -23,6 +27,10 @@ builder.Host.UseSerilog();
 IdentityModule.Register(builder);
 CustomersModule.Register(builder);
 TechniciansModule.Register(builder);
+WorkOrdersModule.Register(builder);
+InventoryModule.Register(builder);
+SchedulingModule.Register(builder);
+InvoicingModule.Register(builder);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -125,6 +133,10 @@ app.UseAuthorization();
 IdentityModule.MapEndpoints(app);
 CustomersModule.MapEndpoints(app);
 TechniciansModule.MapEndpoints(app);
+WorkOrdersModule.MapEndpoints(app);
+InventoryModule.MapEndpoints(app);
+SchedulingModule.MapEndpoints(app);
+InvoicingModule.MapEndpoints(app);
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 

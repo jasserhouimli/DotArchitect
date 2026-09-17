@@ -2,7 +2,11 @@
   <Folder Name="/src/" />
   <Folder Name="/src/Modules/">
     <Project Path="src/Modules/FieldOps.Modules.Customers/FieldOps.Modules.Customers.csproj" />
+    <Project Path="src/Modules/FieldOps.Modules.Inventory/FieldOps.Modules.Inventory.csproj" />
+    <Project Path="src/Modules/FieldOps.Modules.Invoicing/FieldOps.Modules.Invoicing.csproj" />
+    <Project Path="src/Modules/FieldOps.Modules.Scheduling/FieldOps.Modules.Scheduling.csproj" />
     <Project Path="src/Modules/FieldOps.Modules.Technicians/FieldOps.Modules.Technicians.csproj" />
+    <Project Path="src/Modules/FieldOps.Modules.WorkOrders/FieldOps.Modules.WorkOrders.csproj" />
   </Folder>
   <Project Path="src/FieldOps.Api/FieldOps.Api.csproj" />
   <Project Path="src/FieldOps.Infrastructure/FieldOps.Infrastructure.csproj" />

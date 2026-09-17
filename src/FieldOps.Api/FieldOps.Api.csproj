@@ -24,6 +24,10 @@
     <ProjectReference Include="..\FieldOps.Infrastructure\FieldOps.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\FieldOps.Modules.Customers\FieldOps.Modules.Customers.csproj" />
     <ProjectReference Include="..\Modules\FieldOps.Modules.Technicians\FieldOps.Modules.Technicians.csproj" />
+    <ProjectReference Include="..\Modules\FieldOps.Modules.WorkOrders\FieldOps.Modules.WorkOrders.csproj" />
+    <ProjectReference Include="..\Modules\FieldOps.Modules.Inventory\FieldOps.Modules.Inventory.csproj" />
+    <ProjectReference Include="..\Modules\FieldOps.Modules.Scheduling\FieldOps.Modules.Scheduling.csproj" />
+    <ProjectReference Include="..\Modules\FieldOps.Modules.Invoicing\FieldOps.Modules.Invoicing.csproj" />
   </ItemGroup>
 
 </Project>
