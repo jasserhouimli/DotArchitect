@@ -1,8 +1,6 @@
 # FieldOps
 
-A field service management platform for companies that send technicians to customer sites. Think of it as a simplified version of ServiceTitan or Jobber — it handles customers, technicians, work orders, scheduling, inventory, and invoicing in one place.
-
-The goal is to learn .NET backend development by building something real, not a todo app.
+FieldOps is a field service management platform designed for companies that manage field technicians and service operations. It provides tools for managing customers, work orders, technician scheduling, parts inventory, and invoicing — all within a single modular backend.
 
 ## Tech
 
