@@ -13,11 +13,14 @@ FieldOps is a field service management platform designed for companies that mana
 
 ## Architecture
 
-The project follows a **modular monolith** approach. Each business domain (Identity, Customers, Work Orders, etc.) lives in its own project with its own DbContext, but they all share a single PostgreSQL database with separate schemas per module.
-
-Within each module, the code is organized by **vertical slices** — each feature (e.g. CreateWorkOrder) has its own Request, Handler, Endpoint, and Validator. There are no controllers, everything uses Minimal APIs.
-
-Modules don't reference each other. When one module needs data from another, it uses plain Guid foreign keys — no navigation properties across module boundaries.
+- Modular monolith with separate project per domain
+- Vertical slice architecture (one folder per feature)
+- Minimal APIs (no controllers)
+- CQS pattern with `Result<T>` response type
+- Single PostgreSQL database with schema separation per module
+- No cross-module project references, plain Guid FKs between domains
+- FluentValidation on all inbound requests
+- JWT Bearer authentication with HttpOnly cookie transport
 
 ## Modules
 
