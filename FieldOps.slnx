@@ -8,9 +8,6 @@
     <Project Path="src/Modules/FieldOps.Modules.Technicians/FieldOps.Modules.Technicians.csproj" />
     <Project Path="src/Modules/FieldOps.Modules.WorkOrders/FieldOps.Modules.WorkOrders.csproj" />
   </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/FieldOps.Tests/FieldOps.Tests.csproj" />
-  </Folder>
   <Project Path="src/FieldOps.Api/FieldOps.Api.csproj" />
   <Project Path="src/FieldOps.Infrastructure/FieldOps.Infrastructure.csproj" />
   <Project Path="src/Modules/FieldOps.Modules.Identity/FieldOps.Modules.Identity.csproj" />
