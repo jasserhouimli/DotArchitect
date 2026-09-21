@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Modules/">
+    <Project Path="src/Modules/DotArchitect.Modules.Identity/DotArchitect.Modules.Identity.csproj" />
+  </Folder>
+  <Project Path="src/DotArchitect.Api/DotArchitect.Api.csproj" />
+  <Project Path="src/DotArchitect.Infrastructure/DotArchitect.Infrastructure.csproj" />
+</Solution>

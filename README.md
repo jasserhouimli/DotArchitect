@@ -1,6 +1,13 @@
-# FieldOps
+# DotArchitect
 
-FieldOps is a field service management platform designed for companies that manage field technicians and service operations. It provides tools for managing customers, work orders, technician scheduling, parts inventory, and invoicing — all within a single modular backend.
+> Explore. Design. Generate .NET solutions.
+
+DotArchitect is a web application for understanding, designing, and generating .NET solution architectures through an interactive project graph.
+
+## Modes
+
+- **Explore:** Upload a .NET solution ZIP, analyze project references, and explore the dependency graph
+- **Design:** Create a solution structure visually, add projects and references, validate, and generate real `.sln` and `.csproj` files
 
 ## Tech
 
@@ -10,6 +17,7 @@ FieldOps is a field service management platform designed for companies that mana
 - FluentValidation for request validation
 - Serilog for logging
 - Swagger for API docs
+- React + TypeScript + Cytoscape.js (planned)
 
 ## Architecture
 
@@ -18,21 +26,20 @@ FieldOps is a field service management platform designed for companies that mana
 - Minimal APIs (no controllers)
 - CQS pattern with `Result<T>` response type
 - Single PostgreSQL database with schema separation per module
-- No cross-module project references, plain Guid FKs between domains
+- No cross-module project references
 - FluentValidation on all inbound requests
-- JWT Bearer authentication with HttpOnly cookie transport
+- Graph algorithms kept independent of ASP.NET Core and EF Core
 
 ## Modules
 
-| Module | Schema | What it does |
-|--------|--------|--------------|
-| Identity | `identity` | User registration, login, JWT auth, token refresh |
-| Customers | `customers` | Customer CRUD with search and pagination |
-| Technicians | `technicians` | Technician profiles and skills management |
-| Work Orders | `work_orders` | Jobs linked to customers and technicians, with status tracking and assignment |
-| Inventory | `inventory` | Parts and supplies tracking with stock transactions |
-| Scheduling | `scheduling` | Technician appointments with date range filtering |
-| Invoicing | `invoicing` | Invoice generation with line items, tax calculation, and status workflow |
+| Module | Responsibility |
+|--------|---------------|
+| Identity | User registration, login, JWT auth, token refresh |
+| Workspaces | Workspace lifecycle, ownership, access checks |
+| Analysis | ZIP upload, project discovery, parsing, graph building |
+| Graph | Dependency traversal, cycle detection, impact analysis |
+| Design | Visual solution design, project definitions, validation |
+| Generation | `.sln` and `.csproj` file generation |
 
 ## Getting Started
 
@@ -45,64 +52,40 @@ FieldOps is a field service management platform designed for companies that mana
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/jasserhouimli/FieldOps.git
-   cd FieldOps
+   git clone https://github.com/jasserhouimli/DotArchitect.git
+   cd DotArchitect
    ```
 
 2. Copy the example config and fill in your database credentials:
    ```bash
-   cp src/FieldOps.Api/appsettings.json src/FieldOps.Api/appsettings.Development.json
+   cp src/DotArchitect.Api/appsettings.json src/DotArchitect.Api/appsettings.Development.json
    ```
    Edit `appsettings.Development.json` with your PostgreSQL connection string and a JWT secret key (at least 32 characters).
 
 3. Apply migrations:
    ```bash
-   dotnet ef database update --context IdentityDbContext --project src/Modules/FieldOps.Modules.Identity --startup-project src/FieldOps.Api
-   dotnet ef database update --context CustomersDbContext --project src/Modules/FieldOps.Modules.Customers --startup-project src/FieldOps.Api
-   dotnet ef database update --context TechniciansDbContext --project src/Modules/FieldOps.Modules.Technicians --startup-project src/FieldOps.Api
-   dotnet ef database update --context WorkOrdersDbContext --project src/Modules/FieldOps.Modules.WorkOrders --startup-project src/FieldOps.Api
-   dotnet ef database update --context InventoryDbContext --project src/Modules/FieldOps.Modules.Inventory --startup-project src/FieldOps.Api
-   dotnet ef database update --context SchedulingDbContext --project src/Modules/FieldOps.Modules.Scheduling --startup-project src/FieldOps.Api
-   dotnet ef database update --context InvoicingDbContext --project src/Modules/FieldOps.Modules.Invoicing --startup-project src/FieldOps.Api
+   dotnet ef database update --context IdentityDbContext --project src/Modules/DotArchitect.Modules.Identity --startup-project src/DotArchitect.Api
    ```
 
 4. Run the API:
    ```bash
-   dotnet run --project src/FieldOps.Api
+   dotnet run --project src/DotArchitect.Api
    ```
 
 5. Open Swagger at `https://localhost:5001/swagger`
 
-## API at a Glance
+## API
 
-All endpoints require JWT authentication unless noted otherwise. The JWT is returned in a cookie on login and sent back automatically.
+All endpoints require JWT authentication unless noted otherwise.
 
 **Auth:** `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /auth/refresh`, `POST /auth/logout`
-
-**Customers:** `POST /customers`, `GET /customers`, `GET /customers/{id}`, `PUT /customers/{id}`, `DELETE /customers/{id}`
-
-**Technicians:** `POST /technicians`, `GET /technicians`, `GET /technicians/{id}`, `PUT /technicians/{id}`, `DELETE /technicians/{id}`, `POST /technicians/{id}/skills`
-
-**Work Orders:** `POST /work-orders`, `GET /work-orders`, `GET /work-orders/{id}`, `PUT /work-orders/{id}`, `DELETE /work-orders/{id}`, `PUT /work-orders/{id}/assign-technician`
-
-**Inventory:** `POST /inventory`, `GET /inventory`, `GET /inventory/{id}`, `PUT /inventory/{id}`, `DELETE /inventory/{id}`, `POST /inventory/transactions`
-
-**Scheduling:** `POST /schedules`, `GET /schedules`, `GET /schedules/{id}`, `PUT /schedules/{id}`, `DELETE /schedules/{id}`
-
-**Invoicing:** `POST /invoices`, `GET /invoices`, `GET /invoices/{id}`, `PUT /invoices/{id}`, `DELETE /invoices/{id}`, `POST /invoices/{id}/items`
 
 ## Project Structure
 
 ```
 src/
-├── FieldOps.Api/                          # Entry point, auth config, middleware
-├── FieldOps.Infrastructure/               # Result pattern, middleware, shared code
+├── DotArchitect.Api/                          # Entry point, auth config, middleware
+├── DotArchitect.Infrastructure/               # Result pattern, middleware, shared code
 └── Modules/
-    ├── FieldOps.Modules.Identity/         # Users, auth, JWT
-    ├── FieldOps.Modules.Customers/        # Customer management
-    ├── FieldOps.Modules.Technicians/      # Technician profiles & skills
-    ├── FieldOps.Modules.WorkOrders/       # Jobs & assignment
-    ├── FieldOps.Modules.Inventory/        # Parts & stock tracking
-    ├── FieldOps.Modules.Scheduling/       # Appointments
-    └── FieldOps.Modules.Invoicing/        # Billing & line items
+    └── DotArchitect.Modules.Identity/         # Users, auth, JWT
 ```
