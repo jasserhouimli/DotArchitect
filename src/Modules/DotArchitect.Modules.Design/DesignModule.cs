@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +27,11 @@ public static class DesignModule
             options.UseNpgsql(connectionString));
 
         builder.Services.AddScoped<DesignDbContext>();
+
+        builder.Services.AddScoped<IValidator<CreateDesignRequest>, CreateDesignRequestValidator>();
+        builder.Services.AddScoped<IValidator<AddProjectRequest>, AddProjectRequestValidator>();
+        builder.Services.AddScoped<IValidator<UpdateProjectRequest>, UpdateProjectRequestValidator>();
+
         builder.Services.AddScoped<CreateDesignHandler>();
         builder.Services.AddScoped<ListDesignsHandler>();
         builder.Services.AddScoped<GetDesignHandler>();

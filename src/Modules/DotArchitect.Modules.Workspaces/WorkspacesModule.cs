@@ -21,8 +21,10 @@ public static class WorkspacesModule
         builder.Services.AddDbContext<WorkspacesDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        builder.Services.AddValidatorsFromAssemblyContaining<WorkspacesDbContext>();
         builder.Services.AddScoped<WorkspacesDbContext>();
+
+        builder.Services.AddScoped<IValidator<CreateWorkspaceRequest>, CreateWorkspaceRequestValidator>();
+        builder.Services.AddScoped<IValidator<RenameWorkspaceRequest>, RenameWorkspaceRequestValidator>();
 
         builder.Services.AddScoped<CreateWorkspaceHandler>();
         builder.Services.AddScoped<ListWorkspacesHandler>();
