@@ -5,6 +5,7 @@
     <Project Path="src/Modules/DotArchitect.Modules.Workspaces/DotArchitect.Modules.Workspaces.csproj" />
     <Project Path="src/Modules/DotArchitect.Modules.Analysis/DotArchitect.Modules.Analysis.csproj" />
     <Project Path="src/Modules/DotArchitect.Modules.Graph/DotArchitect.Modules.Graph.csproj" />
+    <Project Path="src/Modules/DotArchitect.Modules.Design/DotArchitect.Modules.Design.csproj" />
   </Folder>
   <Project Path="src/DotArchitect.Api/DotArchitect.Api.csproj" />
   <Project Path="src/DotArchitect.Infrastructure/DotArchitect.Infrastructure.csproj" />

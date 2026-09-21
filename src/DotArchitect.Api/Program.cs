@@ -5,6 +5,7 @@ using DotArchitect.Modules.Identity;
 using DotArchitect.Modules.Workspaces;
 using DotArchitect.Modules.Analysis;
 using DotArchitect.Modules.Graph;
+using DotArchitect.Modules.Design;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -25,6 +26,7 @@ IdentityModule.Register(builder);
 WorkspacesModule.Register(builder);
 AnalysisModule.Register(builder);
 GraphModule.Register(builder);
+DesignModule.Register(builder);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -127,6 +129,7 @@ IdentityModule.MapEndpoints(app);
 WorkspacesModule.MapEndpoints(app);
 AnalysisModule.MapEndpoints(app);
 GraphModule.MapEndpoints(app);
+DesignModule.MapEndpoints(app);
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 

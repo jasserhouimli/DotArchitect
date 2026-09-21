@@ -24,6 +24,7 @@
     <ProjectReference Include="..\Modules\DotArchitect.Modules.Workspaces\DotArchitect.Modules.Workspaces.csproj" />
     <ProjectReference Include="..\Modules\DotArchitect.Modules.Analysis\DotArchitect.Modules.Analysis.csproj" />
     <ProjectReference Include="..\Modules\DotArchitect.Modules.Graph\DotArchitect.Modules.Graph.csproj" />
+    <ProjectReference Include="..\Modules\DotArchitect.Modules.Design\DotArchitect.Modules.Design.csproj" />
     <ProjectReference Include="..\DotArchitect.Infrastructure\DotArchitect.Infrastructure.csproj" />
   </ItemGroup>
 
