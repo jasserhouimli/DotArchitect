@@ -2,6 +2,9 @@ using System.Text;
 using System.Threading.RateLimiting;
 using DotArchitect.Infrastructure.Middleware;
 using DotArchitect.Modules.Identity;
+using DotArchitect.Modules.Workspaces;
+using DotArchitect.Modules.Analysis;
+using DotArchitect.Modules.Graph;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -19,6 +22,9 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 IdentityModule.Register(builder);
+WorkspacesModule.Register(builder);
+AnalysisModule.Register(builder);
+GraphModule.Register(builder);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -118,6 +124,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 IdentityModule.MapEndpoints(app);
+WorkspacesModule.MapEndpoints(app);
+AnalysisModule.MapEndpoints(app);
+GraphModule.MapEndpoints(app);
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
