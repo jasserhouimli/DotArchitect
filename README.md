@@ -1,13 +1,8 @@
-# DotArchitect
+# Reflow — Visual Workflow Orchestration Platform
 
-> Explore. Design. Generate .NET solutions.
+> Backend-focused portfolio project with a visual frontend and data-engineering capabilities
 
-DotArchitect is a web application for understanding, designing, and generating .NET solution architectures through an interactive project graph.
-
-## Modes
-
-- **Explore:** Upload a .NET solution ZIP, analyze project references, and explore the dependency graph
-- **Design:** Create a solution structure visually, add projects and references, validate, and generate real `.sln` and `.csproj` files
+Reflow is a visual workflow orchestration platform for defining, validating, versioning, executing, monitoring, and recovering automated workflows. A user builds a workflow from connected task nodes. The backend validates the workflow graph, stores immutable published versions, schedules work, executes tasks asynchronously, records state and logs, and handles failures and retries.
 
 ## Tech
 
@@ -17,29 +12,28 @@ DotArchitect is a web application for understanding, designing, and generating .
 - FluentValidation for request validation
 - Serilog for logging
 - Swagger for API docs
-- React + TypeScript + Cytoscape.js (planned)
+- React + TypeScript + Vite + Tailwind CSS + shadcn/ui
 
 ## Architecture
 
-- Modular monolith with separate project per domain
+- Modular monolith with separate project per module
 - Vertical slice architecture (one folder per feature)
 - Minimal APIs (no controllers)
-- CQS pattern with `Result<T>` response type
+- `Result<T>` response type
 - Single PostgreSQL database with schema separation per module
 - No cross-module project references
-- FluentValidation on all inbound requests
-- Graph algorithms kept independent of ASP.NET Core and EF Core
 
 ## Modules
 
-| Module | Responsibility |
-|--------|---------------|
-| Identity | User registration, login, JWT auth, token refresh |
-| Workspaces | Workspace lifecycle, ownership, access checks |
-| Analysis | ZIP upload, project discovery, parsing, graph building |
-| Graph | Dependency traversal, cycle detection, impact analysis |
-| Design | Visual solution design, project definitions, validation |
-| Generation | `.sln` and `.csproj` file generation |
+| Module | Responsibility | Status |
+|--------|---------------|--------|
+| Identity | User registration, login, JWT auth, token refresh | Done |
+| WorkflowDesign | Workflow CRUD, nodes/edges, validation (DAG), publish/versioning | Done |
+| WorkflowExecution | Runs, task runs, attempts, logs, retry, worker | Planned |
+| DataProcessing | CSV / HTTP ingestion, transform, aggregate | Planned |
+| Observability | Run monitoring, metrics, health checks | Planned |
+
+See `Reflow_Project_Specification.md` for the full specification and roadmap.
 
 ## Getting Started
 
@@ -47,45 +41,75 @@ DotArchitect is a web application for understanding, designing, and generating .
 
 - .NET 10 SDK
 - PostgreSQL
+- Node.js (for frontend)
 
 ### Setup
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/jasserhouimli/DotArchitect.git
-   cd DotArchitect
+   git clone https://github.com/jasserhouimli/Reflow.git
+   cd Reflow
    ```
 
-2. Copy the example config and fill in your database credentials:
-   ```bash
-   cp src/DotArchitect.Api/appsettings.json src/DotArchitect.Api/appsettings.Development.json
+2. Create `src/Reflow.Api/appsettings.Development.json`:
+   ```json
+   {
+     "ConnectionStrings": {
+       "Reflow": "Host=localhost;Port=5432;Database=reflow;Username=postgres;Password=root"
+     },
+     "Jwt": {
+       "Key": "your-32-char-secret-key-here-1234567890"
+     }
+   }
    ```
-   Edit `appsettings.Development.json` with your PostgreSQL connection string and a JWT secret key (at least 32 characters).
 
 3. Apply migrations:
    ```bash
-   dotnet ef database update --context IdentityDbContext --project src/Modules/DotArchitect.Modules.Identity --startup-project src/DotArchitect.Api
+   dotnet ef database update --context IdentityDbContext --project src/Reflow.Api
+   dotnet ef database update --context WorkflowDesignDbContext --project src/Reflow.Api
    ```
 
 4. Run the API:
    ```bash
-   dotnet run --project src/DotArchitect.Api
+   dotnet run --project src/Reflow.Api --urls http://localhost:5001
    ```
 
-5. Open Swagger at `https://localhost:5001/swagger`
+5. Run the frontend:
+   ```bash
+   cd frontend && npm install && npm run dev
+   ```
+   Open http://localhost:5173
+
+6. Open Swagger at `http://localhost:5001/swagger`
 
 ## API
 
-All endpoints require JWT authentication unless noted otherwise.
-
-**Auth:** `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /auth/refresh`, `POST /auth/logout`
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | /api/v1/auth/register | Register |
+| POST | /api/v1/auth/login | Login |
+| GET | /api/v1/auth/me | Current user |
+| POST | /api/v1/auth/logout | Logout |
+| POST | /api/v1/workflows | Create workflow |
+| GET | /api/v1/workflows | List workflows |
+| GET | /api/v1/workflows/{id} | Get workflow |
+| PUT | /api/v1/workflows/{id} | Update workflow (nodes/edges) |
+| DELETE | /api/v1/workflows/{id} | Delete workflow |
+| POST | /api/v1/workflows/{id}/validate | Validate workflow |
+| POST | /api/v1/workflows/{id}/publish | Publish workflow version |
 
 ## Project Structure
 
 ```
 src/
-├── DotArchitect.Api/                          # Entry point, auth config, middleware
-├── DotArchitect.Infrastructure/               # Result pattern, middleware, shared code
+├── Reflow.Api/                          # Entry point, auth config, middleware
+├── Reflow.Infrastructure/               # Result pattern, middleware, shared code
 └── Modules/
-    └── DotArchitect.Modules.Identity/         # Users, auth, JWT
+    ├── Reflow.Modules.Identity/         # Users, auth, JWT
+    └── Reflow.Modules.WorkflowDesign/   # Workflows, nodes, edges, versions
+frontend/
+└── src/
+    ├── api/client.ts
+    ├── pages/ (Login, Dashboard, WorkflowEditor)
+    └── components/ui/
 ```

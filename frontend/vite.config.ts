@@ -12,7 +12,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'https://localhost:5001',
+      '/api': 'http://localhost:5001',
+      '/auth': 'http://localhost:5001',
     },
   },
 })

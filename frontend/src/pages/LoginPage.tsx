@@ -38,7 +38,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     <div className="min-h-screen flex items-center justify-center">
       <Card className="w-[400px]">
         <CardHeader>
-          <CardTitle>DotArchitect</CardTitle>
+          <CardTitle>Reflow</CardTitle>
           <CardDescription>{isRegister ? "Create an account" : "Sign in"}</CardDescription>
         </CardHeader>
         <CardContent>

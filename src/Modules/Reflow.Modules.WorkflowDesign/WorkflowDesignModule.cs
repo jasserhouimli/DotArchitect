@@ -1,0 +1,49 @@
+using FluentValidation;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Reflow.Modules.WorkflowDesign.Persistence;
+using Reflow.Modules.WorkflowDesign.Features.CreateWorkflow;
+using Reflow.Modules.WorkflowDesign.Features.ListWorkflows;
+using Reflow.Modules.WorkflowDesign.Features.GetWorkflow;
+using Reflow.Modules.WorkflowDesign.Features.UpdateWorkflow;
+using Reflow.Modules.WorkflowDesign.Features.DeleteWorkflow;
+using Reflow.Modules.WorkflowDesign.Features.PublishWorkflow;
+using Reflow.Modules.WorkflowDesign.Features.ValidateWorkflow;
+
+namespace Reflow.Modules.WorkflowDesign;
+
+public static class WorkflowDesignModule
+{
+    public static void Register(WebApplicationBuilder builder)
+    {
+        var connectionString = builder.Configuration.GetConnectionString("Reflow");
+
+        builder.Services.AddDbContext<WorkflowDesignDbContext>(options =>
+            options.UseNpgsql(connectionString));
+
+        builder.Services.AddScoped<WorkflowDesignDbContext>();
+
+        builder.Services.AddScoped<IValidator<CreateWorkflowRequest>, CreateWorkflowRequestValidator>();
+
+        builder.Services.AddScoped<CreateWorkflowHandler>();
+        builder.Services.AddScoped<ListWorkflowsHandler>();
+        builder.Services.AddScoped<GetWorkflowHandler>();
+        builder.Services.AddScoped<UpdateWorkflowHandler>();
+        builder.Services.AddScoped<DeleteWorkflowHandler>();
+        builder.Services.AddScoped<PublishWorkflowHandler>();
+        builder.Services.AddScoped<ValidateWorkflowHandler>();
+    }
+
+    public static void MapEndpoints(WebApplication app)
+    {
+        CreateWorkflowEndpoint.Map(app);
+        ListWorkflowsEndpoint.Map(app);
+        GetWorkflowEndpoint.Map(app);
+        UpdateWorkflowEndpoint.Map(app);
+        DeleteWorkflowEndpoint.Map(app);
+        PublishWorkflowEndpoint.Map(app);
+        ValidateWorkflowEndpoint.Map(app);
+    }
+}
