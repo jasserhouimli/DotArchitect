@@ -12,6 +12,7 @@ Reflow is a visual workflow orchestration platform for defining, validating, ver
 - FluentValidation for request validation
 - Serilog for logging
 - Swagger for API docs
+<<<<<<< HEAD
 - React + TypeScript + Vite + Tailwind CSS + shadcn/ui
 
 ## Architecture
