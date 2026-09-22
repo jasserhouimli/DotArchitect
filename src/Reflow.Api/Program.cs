@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Reflow.Infrastructure.Middleware;
 using Reflow.Modules.Identity;
 using Reflow.Modules.WorkflowDesign;
+using Reflow.Modules.WorkflowExecution;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -21,6 +22,7 @@ builder.Host.UseSerilog();
 
 IdentityModule.Register(builder);
 WorkflowDesignModule.Register(builder);
+WorkflowExecutionModule.Register(builder);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -121,6 +123,7 @@ app.UseAuthorization();
 
 IdentityModule.MapEndpoints(app);
 WorkflowDesignModule.MapEndpoints(app);
+WorkflowExecutionModule.MapEndpoints(app);
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 

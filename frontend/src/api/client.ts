@@ -85,3 +85,17 @@ export const workflows = {
   publish: (id: string) => request<{ version: number }>(`/workflows/${id}/publish`, { method: 'POST' }),
   validate: (id: string) => request<{ isValid: boolean; errors: string[]; warnings: string[] }>(`/workflows/${id}/validate`, { method: 'POST' }),
 };
+
+export interface WorkflowRun { id: string; workflowId: string; versionNumber: number; status: number; createdAt: string; startedAt: string | null; completedAt: string | null; error: string | null; }
+export interface TaskRun { id: string; workflowRunId: string; nodeId: string; nodeType: string; status: number; error: string | null; }
+
+export const runs = {
+  start: async (workflowId: string) => {
+    const res = await request<{ id: string }>(`/workflows/${workflowId}/runs`, { method: 'POST' });
+    return res.id;
+  },
+  list: (workflowId: string) => request<WorkflowRun[]>(`/workflows/${workflowId}/runs`),
+  get: (runId: string) => request<WorkflowRun>(`/runs/${runId}`),
+  tasks: (runId: string) => request<TaskRun[]>(`/runs/${runId}/tasks`),
+  logs: (runId: string) => request<Array<{ message: string; level: string; timestamp: string }>>(`/runs/${runId}/logs`),
+};
