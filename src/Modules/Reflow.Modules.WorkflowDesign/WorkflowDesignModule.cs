@@ -11,6 +11,8 @@ using Reflow.Modules.WorkflowDesign.Features.UpdateWorkflow;
 using Reflow.Modules.WorkflowDesign.Features.DeleteWorkflow;
 using Reflow.Modules.WorkflowDesign.Features.PublishWorkflow;
 using Reflow.Modules.WorkflowDesign.Features.ValidateWorkflow;
+using Reflow.Modules.WorkflowDesign.Features.ArchiveWorkflow;
+using Reflow.Modules.WorkflowDesign.Features.Versions;
 
 namespace Reflow.Modules.WorkflowDesign;
 
@@ -34,6 +36,9 @@ public static class WorkflowDesignModule
         builder.Services.AddScoped<DeleteWorkflowHandler>();
         builder.Services.AddScoped<PublishWorkflowHandler>();
         builder.Services.AddScoped<ValidateWorkflowHandler>();
+        builder.Services.AddScoped<ArchiveWorkflowHandler>();
+        builder.Services.AddScoped<ListVersionsHandler>();
+        builder.Services.AddScoped<GetVersionHandler>();
     }
 
     public static void MapEndpoints(WebApplication app)
@@ -45,5 +50,8 @@ public static class WorkflowDesignModule
         DeleteWorkflowEndpoint.Map(app);
         PublishWorkflowEndpoint.Map(app);
         ValidateWorkflowEndpoint.Map(app);
+        ArchiveWorkflowEndpoint.Map(app);
+        ListVersionsEndpoint.Map(app);
+        GetVersionEndpoint.Map(app);
     }
 }

@@ -72,6 +72,18 @@ export interface WorkflowDetail extends Workflow {
   edges: WorkflowEdge[];
 }
 
+export interface WorkflowVersion {
+  id: string;
+  versionNumber: number;
+  publishedAt: string;
+  publishedBy: string;
+}
+
+export interface WorkflowVersionDetail extends WorkflowVersion {
+  workflowId: string;
+  definitionJson: string;
+}
+
 export const workflows = {
   list: () => request<Workflow[]>('/workflows'),
   get: (id: string) => request<WorkflowDetail>(`/workflows/${id}`),
@@ -84,10 +96,26 @@ export const workflows = {
   delete: (id: string) => request<void>(`/workflows/${id}`, { method: 'DELETE' }),
   publish: (id: string) => request<{ version: number }>(`/workflows/${id}/publish`, { method: 'POST' }),
   validate: (id: string) => request<{ isValid: boolean; errors: string[]; warnings: string[] }>(`/workflows/${id}/validate`, { method: 'POST' }),
+  archive: (id: string) => request<{ message: string }>(`/workflows/${id}/archive`, { method: 'POST' }),
+  versions: (id: string) => request<WorkflowVersion[]>(`/workflows/${id}/versions`),
+  version: (id: string, n: number) => request<WorkflowVersionDetail>(`/workflows/${id}/versions/${n}`),
 };
 
-export interface WorkflowRun { id: string; workflowId: string; versionNumber: number; status: number; createdAt: string; startedAt: string | null; completedAt: string | null; error: string | null; }
-export interface TaskRun { id: string; workflowRunId: string; nodeId: string; nodeType: string; status: number; error: string | null; }
+export interface WorkflowRun {
+  id: string; workflowId: string; versionNumber: number; status: number;
+  createdAt: string; startedAt: string | null; completedAt: string | null; error: string | null;
+  totalTasks: number; completedTasks: number; failedTasks: number;
+}
+export interface TaskRun {
+  id: string; workflowRunId: string; nodeId: string; nodeType: string; status: number; error: string | null;
+  createdAt: string; startedAt: string | null; completedAt: string | null;
+  attemptCount: number; outputSummary: string | null; rowCount: number | null;
+}
+export interface TaskDetail extends TaskRun { configJson: string | null; outputJson: string | null; }
+export interface Attempt {
+  id: string; attemptNumber: number; status: number;
+  startedAt: string; completedAt: string | null; error: string | null; log: string | null;
+}
 
 export const runs = {
   start: async (workflowId: string) => {
@@ -97,5 +125,17 @@ export const runs = {
   list: (workflowId: string) => request<WorkflowRun[]>(`/workflows/${workflowId}/runs`),
   get: (runId: string) => request<WorkflowRun>(`/runs/${runId}`),
   tasks: (runId: string) => request<TaskRun[]>(`/runs/${runId}/tasks`),
-  logs: (runId: string) => request<Array<{ message: string; level: string; timestamp: string }>>(`/runs/${runId}/logs`),
+  logs: (runId: string) => request<Array<{ id: string; taskRunId: string | null; message: string; level: string; timestamp: string }>>(`/runs/${runId}/logs`),
+  cancel: (runId: string) => request<{ message: string }>(`/runs/${runId}/cancel`, { method: 'POST' }),
 };
+
+export const tasks = {
+  get: (taskId: string) => request<TaskDetail>(`/tasks/${taskId}`),
+  attempts: (taskId: string) => request<Attempt[]>(`/tasks/${taskId}/attempts`),
+  retry: (taskId: string) => request<{ message: string }>(`/tasks/${taskId}/retry`, { method: 'POST' }),
+};
+
+export const artifactUrl = (runId: string, nodeId: string) => `/api/v1/runs/${runId}/artifacts/${encodeURIComponent(nodeId)}`;
+
+export const RUN_STATUSES = ['Queued', 'Running', 'Completed', 'Failed', 'Cancelled'];
+export const TASK_STATUSES = ['Pending', 'Ready', 'Running', 'Completed', 'Failed', 'RetryScheduled', 'Cancelled', 'Skipped'];

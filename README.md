@@ -12,7 +12,6 @@ Reflow is a visual workflow orchestration platform for defining, validating, ver
 - FluentValidation for request validation
 - Serilog for logging
 - Swagger for API docs
-<<<<<<< HEAD
 - React + TypeScript + Vite + Tailwind CSS + shadcn/ui
 
 ## Architecture
@@ -29,10 +28,8 @@ Reflow is a visual workflow orchestration platform for defining, validating, ver
 | Module | Responsibility | Status |
 |--------|---------------|--------|
 | Identity | User registration, login, JWT auth, token refresh | Done |
-| WorkflowDesign | Workflow CRUD, nodes/edges, validation (DAG), publish/versioning | Done |
-| WorkflowExecution | Runs, task runs, attempts, logs, retry, worker | Planned |
-| DataProcessing | CSV / HTTP ingestion, transform, aggregate | Planned |
-| Observability | Run monitoring, metrics, health checks | Planned |
+| WorkflowDesign | Workflow CRUD, nodes/edges, graph + config validation, publish/versioning, archive | Done |
+| WorkflowExecution | Runs, task runs, attempts, logs, retry, cancel, artifacts, worker | Done |
 
 See `Reflow_Project_Specification.md` for the full specification and roadmap.
 
@@ -68,6 +65,7 @@ See `Reflow_Project_Specification.md` for the full specification and roadmap.
    ```bash
    dotnet ef database update --context IdentityDbContext --project src/Reflow.Api
    dotnet ef database update --context WorkflowDesignDbContext --project src/Reflow.Api
+   dotnet ef database update --context WorkflowExecutionDbContext --project src/Reflow.Api
    ```
 
 4. Run the API:
@@ -98,6 +96,19 @@ See `Reflow_Project_Specification.md` for the full specification and roadmap.
 | DELETE | /api/v1/workflows/{id} | Delete workflow |
 | POST | /api/v1/workflows/{id}/validate | Validate workflow |
 | POST | /api/v1/workflows/{id}/publish | Publish workflow version |
+| POST | /api/v1/workflows/{id}/archive | Archive workflow |
+| GET | /api/v1/workflows/{id}/versions | List published versions |
+| GET | /api/v1/workflows/{id}/versions/{n} | Get version definition |
+| POST | /api/v1/workflows/{id}/runs | Start a run |
+| GET | /api/v1/workflows/{id}/runs | List runs |
+| GET | /api/v1/runs/{id} | Get run |
+| POST | /api/v1/runs/{id}/cancel | Cancel run |
+| GET | /api/v1/runs/{id}/tasks | List task runs |
+| GET | /api/v1/runs/{id}/logs | Run logs |
+| GET | /api/v1/runs/{id}/artifacts/{node} | Download output artifact |
+| GET | /api/v1/tasks/{id} | Get task run |
+| GET | /api/v1/tasks/{id}/attempts | Task attempts |
+| POST | /api/v1/tasks/{id}/retry | Retry failed task |
 
 ## Project Structure
 
@@ -107,10 +118,23 @@ src/
 ├── Reflow.Infrastructure/               # Result pattern, middleware, shared code
 └── Modules/
     ├── Reflow.Modules.Identity/         # Users, auth, JWT
-    └── Reflow.Modules.WorkflowDesign/   # Workflows, nodes, edges, versions
+    ├── Reflow.Modules.WorkflowDesign/   # Workflows, nodes, edges, validation, versions
+    └── Reflow.Modules.WorkflowExecution/# Runs, handlers, worker, artifacts
 frontend/
 └── src/
     ├── api/client.ts
     ├── pages/ (Login, Dashboard, WorkflowEditor)
     └── components/ui/
 ```
+
+## Supported node types
+
+| Type | Config | Description |
+|------|--------|-------------|
+| `data.csv.read` | `csvText`, `delimiter`, `hasHeader`, `dedupeColumns` | Parse CSV text into rows |
+| `http.request` | `url`, `timeoutSeconds` | GET JSON over HTTPS (SSRF-guarded) |
+| `data.validate` | `requiredColumns` | Reject rows with empty required fields |
+| `data.filter` | `column`, `operator`, `value` | Keep matching rows |
+| `data.transform` | `select`, `renames`, `upperColumns`, `lowerColumns` | Reshape columns |
+| `data.aggregate` | `groupBy`, `operations` (count/sum/avg/min/max) | Group and summarize |
+| `data.output` | `format` (json/csv) | Save downloadable artifact |

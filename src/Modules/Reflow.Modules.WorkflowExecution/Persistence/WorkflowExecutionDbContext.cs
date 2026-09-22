@@ -27,6 +27,8 @@ public class WorkflowExecutionDbContext : DbContext
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.WorkflowRunId);
             e.HasIndex(x => new { x.WorkflowRunId, x.Status });
+            e.Property(x => x.ConfigJson).HasMaxLength(20000);
+            e.Property(x => x.RowVersion).IsRowVersion();
         });
         modelBuilder.Entity<TaskAttempt>(e =>
         {

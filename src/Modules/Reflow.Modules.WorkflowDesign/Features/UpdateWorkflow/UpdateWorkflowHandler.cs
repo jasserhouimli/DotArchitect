@@ -1,6 +1,7 @@
 using Reflow.Modules.WorkflowDesign.Domain;
 using Reflow.Modules.WorkflowDesign.Persistence;
 using Reflow.Modules.WorkflowDesign.Features.GetWorkflow;
+using Reflow.Modules.WorkflowDesign.Validation;
 using Microsoft.EntityFrameworkCore;
 
 namespace Reflow.Modules.WorkflowDesign.Features.UpdateWorkflow;
@@ -12,10 +13,21 @@ public class UpdateWorkflowHandler(WorkflowDesignDbContext db)
         var workflow = await db.Workflows.FirstOrDefaultAsync(w => w.Id == workflowId && w.OwnerId == ownerId, ct);
         if (workflow is null) return false;
 
+        if (workflow.Status == WorkflowStatus.Archived)
+            throw new ArgumentException("Archived workflows cannot be edited");
+
         if (request.Name is not null) workflow.Name = request.Name;
         if (request.Description is not null) workflow.Description = request.Description;
         if (request.Nodes is not null)
         {
+            foreach (var n in request.Nodes)
+            {
+                if (!WorkflowValidator.SupportedNodeTypes.Contains(n.NodeType))
+                    throw new ArgumentException($"Unsupported node type: {n.NodeType}");
+                if (n.ConfigJson is not null && n.ConfigJson.Length > WorkflowValidator.MaxConfigChars)
+                    throw new ArgumentException($"Node '{n.NodeId}' configuration exceeds {WorkflowValidator.MaxConfigChars} characters");
+            }
+
             var existingNodes = await db.WorkflowNodes.Where(n => n.WorkflowId == workflowId).ToListAsync(ct);
             db.WorkflowNodes.RemoveRange(existingNodes);
             foreach (var n in request.Nodes)

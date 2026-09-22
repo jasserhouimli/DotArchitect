@@ -15,6 +15,7 @@ public class WorkflowRun
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? Error { get; set; }
+    public string? EdgesJson { get; set; }
 }
 
 public class TaskRun
@@ -28,6 +29,10 @@ public class TaskRun
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+    public string? ConfigJson { get; set; }
+    public string? OutputJson { get; set; }
+    public DateTime? NotBefore { get; set; }
+    public uint RowVersion { get; set; }
 }
 
 public class TaskAttempt

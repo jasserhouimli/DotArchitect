@@ -15,16 +15,21 @@ public static class GetTaskRunsEndpoint
         {
             var userId = Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var tasks = await handler.Handle(runId, userId, ct);
+            if (tasks is null) return Results.NotFound(new { error = "Run not found" });
             return Results.Ok(tasks);
         }).RequireAuthorization().WithName("GetTaskRuns").WithTags("Runs");
 
         app.MapGet("/api/v1/runs/{runId:guid}/logs", async (
-            Guid runId, GetTaskRunsHandler handler, WorkflowExecutionDbContext db, HttpContext http, CancellationToken ct) =>
+            Guid runId, WorkflowExecutionDbContext db, HttpContext http, CancellationToken ct) =>
         {
             var userId = Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var run = await db.WorkflowRuns.FirstOrDefaultAsync(r => r.Id == runId && r.CreatedBy == userId, ct);
             if (run is null) return Results.NotFound(new { error = "Run not found" });
-            var logs = await db.ExecutionLogs.Where(l => l.WorkflowRunId == runId).OrderBy(l => l.Timestamp).ToListAsync(ct);
+            var logs = await db.ExecutionLogs
+                .Where(l => l.WorkflowRunId == runId)
+                .OrderBy(l => l.Timestamp)
+                .Select(l => new { l.Id, l.TaskRunId, l.Message, l.Level, l.Timestamp })
+                .ToListAsync(ct);
             return Results.Ok(logs);
         }).RequireAuthorization().WithName("GetRunLogs").WithTags("Runs");
     }
