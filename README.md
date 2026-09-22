@@ -17,7 +17,7 @@ DotArchitect is a web application for understanding, designing, and generating .
 - FluentValidation for request validation
 - Serilog for logging
 - Swagger for API docs
-- React + TypeScript + Cytoscape.js (planned)
+- React + TypeScript + Cytoscape.js (Done)
 
 ## Architecture
 
