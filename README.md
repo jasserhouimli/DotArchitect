@@ -1,5 +1,7 @@
 # Reflow — Visual Workflow Orchestration Platform
 
+[![CI](https://github.com/jasserhouimli/Reflow/actions/workflows/ci.yml/badge.svg)](https://github.com/jasserhouimli/Reflow/actions/workflows/ci.yml)
+
 > Backend-focused portfolio project with a visual frontend and data-engineering capabilities
 
 Reflow is a visual workflow orchestration platform for defining, validating, versioning, executing, monitoring, and recovering automated workflows. A user builds a workflow from connected task nodes. The backend validates the workflow graph, stores immutable published versions, schedules work, executes tasks asynchronously, records state and logs, and handles failures and retries.
