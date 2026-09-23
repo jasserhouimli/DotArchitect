@@ -7,4 +7,8 @@
   </Folder>
   <Project Path="src/Reflow.Api/Reflow.Api.csproj" />
   <Project Path="src/Reflow.Infrastructure/Reflow.Infrastructure.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Reflow.UnitTests/Reflow.UnitTests.csproj" />
+    <Project Path="tests/Reflow.IntegrationTests/Reflow.IntegrationTests.csproj" />
+  </Folder>
 </Solution>

@@ -71,16 +71,19 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+    var authLimit = builder.Configuration.GetValue<int?>("RateLimiting:AuthPermitLimit") ?? 5;
+    var generalLimit = builder.Configuration.GetValue<int?>("RateLimiting:GeneralPermitLimit") ?? 100;
+
     options.AddFixedWindowLimiter("auth", limiterOptions =>
     {
-        limiterOptions.PermitLimit = 5;
+        limiterOptions.PermitLimit = authLimit;
         limiterOptions.Window = TimeSpan.FromMinutes(1);
         limiterOptions.QueueLimit = 0;
     });
 
     options.AddFixedWindowLimiter("general", limiterOptions =>
     {
-        limiterOptions.PermitLimit = 100;
+        limiterOptions.PermitLimit = generalLimit;
         limiterOptions.Window = TimeSpan.FromMinutes(1);
         limiterOptions.QueueLimit = 10;
     });
@@ -128,3 +131,5 @@ WorkflowExecutionModule.MapEndpoints(app);
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
 app.Run();
+
+public partial class Program { }

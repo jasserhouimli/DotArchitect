@@ -28,7 +28,20 @@ public class WorkflowWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("WorkflowWorker started");
-        await RecoverInterruptedTasks(stoppingToken);
+
+        try
+        {
+            await RecoverInterruptedTasks(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            // Never let a failed recovery take the whole host down.
+            _logger.LogError(ex, "Worker recovery failed; continuing with normal processing");
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {

@@ -138,3 +138,20 @@ frontend/
 | `data.transform` | `select`, `renames`, `upperColumns`, `lowerColumns` | Reshape columns |
 | `data.aggregate` | `groupBy`, `operations` (count/sum/avg/min/max) | Group and summarize |
 | `data.output` | `format` (json/csv) | Save downloadable artifact |
+
+## Testing
+
+```bash
+dotnet test
+```
+
+- `tests/Reflow.UnitTests` (65 tests) — graph/config validation, CSV parsing,
+  dataset merge/serialization, all data handlers, SSRF guard. No infrastructure needed.
+- `tests/Reflow.IntegrationTests` (19 tests) — full API via `WebApplicationFactory`:
+  auth flows and per-user isolation, workflow CRUD/validate/publish/versions/archive,
+  and complete run pipelines (success with quality counts, failure + manual retry,
+  retry/cancel guards) against a real PostgreSQL database.
+
+Integration tests need PostgreSQL on `localhost:5432` with a `postgres` superuser
+(password `root`, same as the dev setup). They create and use a `reflow_test`
+database automatically; each test registers its own user so no cleanup is needed.

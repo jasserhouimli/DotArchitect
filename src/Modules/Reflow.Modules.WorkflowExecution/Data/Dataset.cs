@@ -46,6 +46,11 @@ public sealed class Dataset
         {
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return null;
+            if (!root.TryGetProperty("columns", out _) && !root.TryGetProperty("rows", out _))
+                return null;
+
             var dataset = new Dataset();
 
             if (root.TryGetProperty("columns", out var cols) && cols.ValueKind == JsonValueKind.Array)
