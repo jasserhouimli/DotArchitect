@@ -245,6 +245,9 @@ public class JsonReadHandler : ITaskHandler
             var config = HandlerHelpers.ParseConfig(ctx.ConfigJson, ctx.NodeId);
             var source = HandlerHelpers.GetString(config, "source", "text");
 
+            if (source.Equals("input", StringComparison.OrdinalIgnoreCase))
+                return ExecuteFromColumn(ctx, config);
+
             string jsonText;
             if (source.Equals("upload", StringComparison.OrdinalIgnoreCase))
                 jsonText = await HandlerHelpers.RequireUploadText(ctx, _uploads, ctx.NodeId, config, ct);
@@ -264,6 +267,149 @@ public class JsonReadHandler : ITaskHandler
         {
             return HandlerHelpers.Fail(ex.Message);
         }
+    }
+
+    private static TaskExecutionResult ExecuteFromColumn(TaskExecutionContext ctx, JsonElement config)
+    {
+        var input = HandlerHelpers.RequireInput(ctx);
+        var column = HandlerHelpers.GetString(config, "column");
+        if (string.IsNullOrWhiteSpace(column))
+            return HandlerHelpers.Fail($"Node '{ctx.NodeId}' requires 'column' when source is 'input'");
+        var colIdx = input.ColumnIndex(column);
+        if (colIdx < 0)
+            return HandlerHelpers.Fail($"Column '{column}' does not exist in input data");
+
+        var rootPath = HandlerHelpers.GetString(config, "rootPath");
+        if (string.IsNullOrWhiteSpace(rootPath))
+            rootPath = null;
+
+        var outColumns = new List<string>(input.Columns);
+        var records = new List<Dictionary<string, string?>>();
+        var rejected = 0;
+        var failures = new Dictionary<string, int>();
+
+        void Reject(string rule)
+        {
+            rejected++;
+            failures[rule] = failures.TryGetValue(rule, out var n) ? n + 1 : 1;
+        }
+
+        foreach (var row in input.Rows)
+        {
+            var cell = colIdx < row.Count ? row[colIdx] : null;
+            if (string.IsNullOrWhiteSpace(cell))
+            {
+                Reject("json:empty");
+                continue;
+            }
+
+            JsonDocument doc;
+            try
+            {
+                doc = JsonDocument.Parse(cell);
+            }
+            catch (JsonException)
+            {
+                Reject("json:parse");
+                continue;
+            }
+
+            using (doc)
+            {
+                var target = doc.RootElement;
+                if (rootPath is not null)
+                {
+                    if (!JsonNavigator.TryNavigate(target, rootPath, out var navigated, out _))
+                    {
+                        Reject("json:parse");
+                        continue;
+                    }
+                    target = navigated.Clone();
+                }
+
+                if (target.ValueKind == JsonValueKind.Array)
+                {
+                    var items = target.EnumerateArray().ToList();
+                    if (items.Count == 0)
+                    {
+                        Reject("json:empty");
+                        continue;
+                    }
+                    if (records.Count + items.Count > Dataset.MaxRows)
+                        return HandlerHelpers.Fail($"Node '{ctx.NodeId}' exploded to too many rows (max {Dataset.MaxRows})");
+                    foreach (var item in items)
+                        records.Add(MergeRecord(row, input.Columns, item, outColumns));
+                }
+                else if (target.ValueKind == JsonValueKind.Object)
+                {
+                    records.Add(MergeRecord(row, input.Columns, target, outColumns));
+                }
+                else
+                {
+                    // Bare scalar: nothing to unpack, row passes through unchanged.
+                    records.Add(BaseRecord(row, input.Columns));
+                }
+            }
+        }
+
+        var dataset = new Dataset();
+        dataset.Columns.AddRange(outColumns);
+        foreach (var record in records)
+        {
+            var outRow = new List<string?>();
+            foreach (var col in outColumns)
+                outRow.Add(record.TryGetValue(col, out var v) ? v : null);
+            dataset.Rows.Add(outRow);
+        }
+        dataset.Quality.InputCount = input.Rows.Count;
+        dataset.Quality.RejectedCount = rejected;
+        dataset.Quality.FailuresByRule = failures;
+
+        return HandlerHelpers.Ok(dataset,
+            $"Unpacked JSON from '{column}': {dataset.Rows.Count} rows, {rejected} rejected");
+    }
+
+    private static Dictionary<string, string?> BaseRecord(List<string?> row, List<string> columns)
+    {
+        var record = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < columns.Count; i++)
+            record[columns[i]] = i < row.Count ? row[i] : null;
+        return record;
+    }
+
+    private static Dictionary<string, string?> MergeRecord(
+        List<string?> row, List<string> columns, JsonElement element, List<string> outColumns)
+    {
+        var record = BaseRecord(row, columns);
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var p in element.EnumerateObject())
+            {
+                record[p.Name] = ScalarValue(p.Value);
+                if (!outColumns.Contains(p.Name, StringComparer.OrdinalIgnoreCase))
+                    outColumns.Add(p.Name);
+            }
+        }
+        else
+        {
+            record["value"] = ScalarValue(element);
+            if (!outColumns.Contains("value", StringComparer.OrdinalIgnoreCase))
+                outColumns.Add("value");
+        }
+        return record;
+    }
+
+    private static string? ScalarValue(JsonElement el)
+    {
+        return el.ValueKind switch
+        {
+            JsonValueKind.String => el.GetString(),
+            JsonValueKind.Number => el.GetRawText(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            JsonValueKind.Null => null,
+            _ => el.GetRawText()
+        };
     }
 }
 

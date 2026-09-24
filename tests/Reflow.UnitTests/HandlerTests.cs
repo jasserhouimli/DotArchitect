@@ -353,6 +353,55 @@ public class HandlerTests
     }
 
     [Fact]
+    public async Task JsonRead_FromColumn_MergesObjects()
+    {
+        var handler = new JsonReadHandler(Uploads());
+        var input = Table(new[] { "id", "payload" }, new[] { "1", "{\"city\":\"Tunis\",\"zip\":\"1000\"}" }, new[] { "2", "not json" }, new[] { "3", null });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("j", "data.json.read", """{"source":"input","column":"payload"}""", input),
+            CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Equal(new[] { "id", "payload", "city", "zip" }, output.Columns);
+        Assert.Equal(1, output.Rows.Count);
+        Assert.Equal("Tunis", output.Rows[0][2]);
+        Assert.Equal(2, output.Quality.RejectedCount);
+        Assert.Equal(1, output.Quality.FailuresByRule["json:parse"]);
+        Assert.Equal(1, output.Quality.FailuresByRule["json:empty"]);
+    }
+
+    [Fact]
+    public async Task JsonRead_FromColumn_ExplodesArrays()
+    {
+        var handler = new JsonReadHandler(Uploads());
+        var input = Table(new[] { "id", "items" }, new[] { "1", "[{\"sku\":\"a\"},{\"sku\":\"b\"}]" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("j", "data.json.read", """{"source":"input","column":"items"}""", input),
+            CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Equal(2, output.Rows.Count);
+        Assert.Equal("a", output.Rows[0][2]);
+        Assert.Equal("1", output.Rows[1][0]);
+    }
+
+    [Fact]
+    public async Task JsonRead_FromColumn_MissingColumn_Fails()
+    {
+        var handler = new JsonReadHandler(Uploads());
+        var input = Table(new[] { "a" }, new[] { "1" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("j", "data.json.read", """{"source":"input","column":"ghost"}""", input),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("ghost", result.Error);
+    }
+
+    [Fact]
     public async Task Validate_TypesAndUnique()
     {
         var handler = new ValidateHandler();

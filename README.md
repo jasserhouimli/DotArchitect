@@ -134,7 +134,7 @@ frontend/
 | Type | Config | Description |
 |------|--------|-------------|
 | `data.csv.read` | `source` (text/upload), `csvText`/`fileId`, `delimiter`, `hasHeader`, `skipRows`, `trim`, `nullValues`, `maxRows`, `dedupeColumns` | Parse CSV from pasted text or an uploaded file |
-| `data.json.read` | `source`, `jsonText`/`fileId`, `rootPath` (e.g. `data.orders`) | Parse JSON, optionally from a nested path |
+| `data.json.read` | `source` (text/upload/input), `jsonText`/`fileId`/`column`, `rootPath` (e.g. `data.orders`) | Parse JSON standalone, or unpack JSON from an upstream column (objects merge, arrays explode) |
 | `http.request` | `url`, `timeoutSeconds`, `headers`, `rootPath`, `pagination` (offset mode) | GET JSON over HTTPS (SSRF-guarded, custom headers allowlisted) |
 | `data.validate` | `requiredColumns`, `columnTypes` (string/number/integer/boolean/date), `uniqueColumns` | Reject rows failing quality rules, with per-rule counts |
 | `data.filter` | `column`, `operator` (equals/notEquals/contains/notContains/startsWith/endsWith/matches/inList/greaterThan/lessThan/isEmpty/isNotEmpty), `value` | Keep matching rows (regex is timeout-guarded) |

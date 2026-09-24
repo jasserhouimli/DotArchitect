@@ -166,11 +166,25 @@ export function NodeConfigForm({ nodeType, config, workflowId, onChange }: Props
       const source = (config.source as string) || "text"
       return (
         <div className="space-y-3">
-          <SourceToggle source={source} onChange={v => {
-            if (v === "upload") setMany({ source: v, jsonText: "" })
-            else setMany({ source: v, fileId: "", fileName: "" })
-          }} />
-          {source === "upload" ? (
+          <div>
+            <label className="text-xs text-muted-foreground">Source</label>
+            <select className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+              value={source} onChange={e => {
+                const v = e.target.value
+                if (v === "upload") setMany({ source: v, jsonText: "" })
+                else if (v === "input") setMany({ source: v, jsonText: "", fileId: "", fileName: "" })
+                else setMany({ source: v, fileId: "", fileName: "" })
+              }}>
+              <option value="text">Pasted content</option>
+              <option value="upload">Uploaded file</option>
+              <option value="input">Upstream input (parse a column)</option>
+            </select>
+          </div>
+          {source === "input" ? (
+            <TextRow label="Column holding JSON (required)" value={(config.column as string) || ""}
+              placeholder="payload"
+              onChange={v => set("column", v)} />
+          ) : source === "upload" ? (
             <FilePicker workflowId={workflowId} accept=".json" fileId={(config.fileId as string) || ""}
               onUploaded={f => setMany({ fileId: f.fileId, fileName: f.fileName })}
               onClear={() => { set("source", "text") }} />
@@ -188,6 +202,11 @@ export function NodeConfigForm({ nodeType, config, workflowId, onChange }: Props
           <TextRow label="Root path (optional, e.g. data.orders)" value={(config.rootPath as string) || ""}
             placeholder="data.orders.0"
             onChange={v => set("rootPath", v)} />
+          {source === "input" && (
+            <p className="text-xs text-muted-foreground">
+              Objects merge into each row (extracted fields win on name clashes); arrays explode into one row per item; bad cells are rejected with counts.
+            </p>
+          )}
         </div>
       )
     }

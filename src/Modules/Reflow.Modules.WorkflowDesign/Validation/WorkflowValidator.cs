@@ -184,13 +184,19 @@ public static class WorkflowValidator
                     {
                         jsonSource = jsonSrc.ValueKind == JsonValueKind.String ? jsonSrc.GetString() ?? "" : "";
                         if (!jsonSource.Equals("text", StringComparison.OrdinalIgnoreCase)
-                            && !jsonSource.Equals("upload", StringComparison.OrdinalIgnoreCase))
-                            errors.Add($"Node '{nodeId}' 'source' must be 'text' or 'upload'");
+                            && !jsonSource.Equals("upload", StringComparison.OrdinalIgnoreCase)
+                            && !jsonSource.Equals("input", StringComparison.OrdinalIgnoreCase))
+                            errors.Add($"Node '{nodeId}' 'source' must be 'text', 'upload' or 'input'");
                     }
                     if (jsonSource.Equals("upload", StringComparison.OrdinalIgnoreCase))
                     {
                         if (!TryGetString(root, "fileId", out var jfid) || !LocalUploadStore.IsValidFileId(jfid ?? string.Empty))
                             errors.Add($"Node '{nodeId}' requires a valid 'fileId' when source is 'upload'");
+                    }
+                    else if (jsonSource.Equals("input", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!TryGetString(root, "column", out var jcol) || string.IsNullOrWhiteSpace(jcol))
+                            errors.Add($"Node '{nodeId}' requires 'column' when source is 'input'");
                     }
                     else if (!TryGetString(root, "jsonText", out var jtext) || string.IsNullOrWhiteSpace(jtext))
                     {

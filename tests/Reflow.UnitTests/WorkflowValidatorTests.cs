@@ -148,6 +148,7 @@ public class WorkflowValidatorTests
 
     [Theory]
     [InlineData("data.json.read", "{}", "jsonText")]
+    [InlineData("data.json.read", """{"source":"input"}""", "'column'")]
     [InlineData("data.csv.read", """{"source":"upload"}""", "fileId")]
     [InlineData("data.sort", "{}", "orderBy")]
     [InlineData("data.limit", "{}", "count")]
@@ -168,6 +169,7 @@ public class WorkflowValidatorTests
 
     [Theory]
     [InlineData("data.json.read", """{"jsonText":"[1]","rootPath":"a.b.0"}""")]
+    [InlineData("data.json.read", """{"source":"input","column":"payload","rootPath":"rows"}""")]
     [InlineData("data.sort", """{"orderBy":[{"column":"a","direction":"desc"}]}""")]
     [InlineData("data.limit", """{"offset":5,"count":10}""")]
     [InlineData("data.dedupe", """{"columns":["a"]}""")]
