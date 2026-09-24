@@ -102,6 +102,17 @@ export function NodeConfigForm({ nodeType, config, workflowId, onChange }: Props
     onChange(next)
   }
 
+  // Batched version: sequential set() calls each read stale state and drop
+  // each other's changes, so multi-field updates must go through one onChange.
+  const setMany = (patch: Record<string, unknown>) => {
+    const next = { ...config }
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined || v === "" || v === null) delete next[k]
+      else next[k] = v
+    }
+    onChange(next)
+  }
+
   switch (nodeType) {
     case "data.csv.read": {
       const source = (config.source as string) || "text"
@@ -110,13 +121,12 @@ export function NodeConfigForm({ nodeType, config, workflowId, onChange }: Props
       return (
         <div className="space-y-3">
           <SourceToggle source={source} onChange={v => {
-            set("source", v)
-            if (v === "upload") set("csvText", "")
-            else { set("fileId", ""); set("fileName", "") }
+            if (v === "upload") setMany({ source: v, csvText: "" })
+            else setMany({ source: v, fileId: "", fileName: "" })
           }} />
           {source === "upload" ? (
             <FilePicker workflowId={workflowId} accept=".csv,.txt" fileId={(config.fileId as string) || ""}
-              onUploaded={f => { set("fileId", f.fileId); set("fileName", f.fileName) }}
+              onUploaded={f => setMany({ fileId: f.fileId, fileName: f.fileName })}
               onClear={() => { set("source", "text") }} />
           ) : (
             <div>
@@ -157,13 +167,12 @@ export function NodeConfigForm({ nodeType, config, workflowId, onChange }: Props
       return (
         <div className="space-y-3">
           <SourceToggle source={source} onChange={v => {
-            set("source", v)
-            if (v === "upload") set("jsonText", "")
-            else { set("fileId", ""); set("fileName", "") }
+            if (v === "upload") setMany({ source: v, jsonText: "" })
+            else setMany({ source: v, fileId: "", fileName: "" })
           }} />
           {source === "upload" ? (
             <FilePicker workflowId={workflowId} accept=".json" fileId={(config.fileId as string) || ""}
-              onUploaded={f => { set("fileId", f.fileId); set("fileName", f.fileName) }}
+              onUploaded={f => setMany({ fileId: f.fileId, fileName: f.fileName })}
               onClear={() => { set("source", "text") }} />
           ) : (
             <div>
@@ -465,8 +474,8 @@ export function NodeConfigForm({ nodeType, config, workflowId, onChange }: Props
           </div>
           <CheckRow label="Same key names on both sides" checked={useOn}
             onChange={v => {
-              if (v) { set("on", parseList(onText)); set("leftOn", undefined); set("rightOn", undefined) }
-              else { set("on", undefined); set("leftOn", parseList(leftText)); set("rightOn", parseList(rightText)) }
+              if (v) setMany({ on: parseList(onText), leftOn: undefined, rightOn: undefined })
+              else setMany({ on: undefined, leftOn: parseList(leftText), rightOn: parseList(rightText) })
             }} />
           {useOn ? (
             <TextRow label="Key columns (required)" value={onText}
