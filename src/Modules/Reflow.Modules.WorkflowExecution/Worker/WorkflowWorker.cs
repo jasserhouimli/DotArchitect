@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Reflow.Modules.WorkflowExecution.Data;
+using Reflow.Infrastructure.Data;
 using Reflow.Modules.WorkflowExecution.Domain;
 using Reflow.Modules.WorkflowExecution.Handlers;
 using Reflow.Modules.WorkflowExecution.Persistence;
@@ -208,7 +208,7 @@ public class WorkflowWorker : BackgroundService
         else
         {
             var inputs = await LoadPredecessorOutputs(run, task.NodeId, execDb, ct);
-            var context = new TaskExecutionContext(run.Id, task.Id, task.NodeId, task.NodeType, task.ConfigJson, inputs);
+            var context = new TaskExecutionContext(run.Id, task.Id, task.NodeId, task.NodeType, task.ConfigJson, inputs, run.WorkflowId);
 
             using var taskCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             taskCts.CancelAfter(TaskTimeout);

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Reflow.Modules.WorkflowExecution.Data;
+namespace Reflow.Infrastructure.Data;
 
 public sealed class DatasetQuality
 {

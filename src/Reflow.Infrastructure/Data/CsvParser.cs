@@ -1,6 +1,4 @@
-using Reflow.Modules.WorkflowExecution.Data;
-
-namespace Reflow.Modules.WorkflowExecution.Data;
+namespace Reflow.Infrastructure.Data;
 
 public static class CsvParser
 {

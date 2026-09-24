@@ -39,10 +39,16 @@ public static class WorkflowExecutionModule
         builder.Services.AddSingleton<IArtifactStore, LocalArtifactStore>();
 
         builder.Services.AddSingleton<ITaskHandler, CsvReadHandler>();
+        builder.Services.AddSingleton<ITaskHandler, JsonReadHandler>();
         builder.Services.AddSingleton<ITaskHandler, ValidateHandler>();
         builder.Services.AddSingleton<ITaskHandler, FilterHandler>();
         builder.Services.AddSingleton<ITaskHandler, TransformHandler>();
         builder.Services.AddSingleton<ITaskHandler, AggregateHandler>();
+        builder.Services.AddSingleton<ITaskHandler, SortHandler>();
+        builder.Services.AddSingleton<ITaskHandler, LimitHandler>();
+        builder.Services.AddSingleton<ITaskHandler, DedupeHandler>();
+        builder.Services.AddSingleton<ITaskHandler, JoinHandler>();
+        builder.Services.AddSingleton<ITaskHandler, ProfileHandler>();
         builder.Services.AddSingleton<ITaskHandler, OutputHandler>();
         builder.Services.AddSingleton<ITaskHandler, HttpRequestHandler>();
         builder.Services.AddSingleton<TaskHandlerRegistry>(sp =>

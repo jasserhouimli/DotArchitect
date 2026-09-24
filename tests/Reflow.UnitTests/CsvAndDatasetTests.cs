@@ -1,4 +1,4 @@
-using Reflow.Modules.WorkflowExecution.Data;
+using Reflow.Infrastructure.Data;
 using Xunit;
 
 namespace Reflow.UnitTests;

@@ -133,13 +133,31 @@ frontend/
 
 | Type | Config | Description |
 |------|--------|-------------|
-| `data.csv.read` | `csvText`, `delimiter`, `hasHeader`, `dedupeColumns` | Parse CSV text into rows |
-| `http.request` | `url`, `timeoutSeconds` | GET JSON over HTTPS (SSRF-guarded) |
-| `data.validate` | `requiredColumns` | Reject rows with empty required fields |
-| `data.filter` | `column`, `operator`, `value` | Keep matching rows |
-| `data.transform` | `select`, `renames`, `upperColumns`, `lowerColumns` | Reshape columns |
-| `data.aggregate` | `groupBy`, `operations` (count/sum/avg/min/max) | Group and summarize |
-| `data.output` | `format` (json/csv) | Save downloadable artifact |
+| `data.csv.read` | `source` (text/upload), `csvText`/`fileId`, `delimiter`, `hasHeader`, `skipRows`, `trim`, `nullValues`, `maxRows`, `dedupeColumns` | Parse CSV from pasted text or an uploaded file |
+| `data.json.read` | `source`, `jsonText`/`fileId`, `rootPath` (e.g. `data.orders`) | Parse JSON, optionally from a nested path |
+| `http.request` | `url`, `timeoutSeconds`, `headers`, `rootPath`, `pagination` (offset mode) | GET JSON over HTTPS (SSRF-guarded, custom headers allowlisted) |
+| `data.validate` | `requiredColumns`, `columnTypes` (string/number/integer/boolean/date), `uniqueColumns` | Reject rows failing quality rules, with per-rule counts |
+| `data.filter` | `column`, `operator` (equals/notEquals/contains/notContains/startsWith/endsWith/matches/inList/greaterThan/lessThan/isEmpty/isNotEmpty), `value` | Keep matching rows (regex is timeout-guarded) |
+| `data.sort` | `orderBy` ([{column, direction}]) | Stable, numeric-aware multi-key sort |
+| `data.limit` | `count`, `offset` | Take a slice of rows |
+| `data.transform` | `select`/`dropColumns`, `renames`, `upperColumns`/`lowerColumns`, `fillNull`, `round`, `concat` | Reshape columns (names always refer to input columns) |
+| `data.dedupe` | `columns` (empty = whole row) | Keep first of each duplicate group |
+| `data.join` | `on` (or `leftOn`/`rightOn`), `how` (inner/left) | Join exactly two inputs on key columns |
+| `data.aggregate` | `groupBy`, `operations` (count/countDistinct/sum/avg/min/max/median) | Group and summarize |
+| `data.profile` | `columns` (empty = all) | One stats row per column (count, nulls, distinct, min/max/mean) |
+| `data.output` | `format` (json/csv), `fileName`, `delimiter`, `includeHeader` | Save downloadable artifact |
+
+## File uploads
+
+Workflows can use uploaded files instead of pasted content (CSV/JSON/TXT, max 10 MB).
+Files are immutable once uploaded, and files referenced by a published version
+cannot be deleted.
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | /api/v1/workflows/{id}/files | Upload a file (multipart `file` field) |
+| GET | /api/v1/workflows/{id}/files | List uploaded files with row/column sniffing |
+| DELETE | /api/v1/workflows/{id}/files/{fileId} | Delete a file (409 if published) |
 
 ## Testing
 

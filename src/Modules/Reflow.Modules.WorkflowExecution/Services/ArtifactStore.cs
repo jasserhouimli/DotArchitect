@@ -1,11 +1,11 @@
 using System.Text;
-using Reflow.Modules.WorkflowExecution.Data;
+using Reflow.Infrastructure.Data;
 
 namespace Reflow.Modules.WorkflowExecution.Services;
 
 public interface IArtifactStore
 {
-    Task<string> SaveAsync(Guid runId, string nodeId, Dataset dataset, string format, CancellationToken ct);
+    Task<string> SaveAsync(Guid runId, string nodeId, Dataset dataset, string format, string? fileName, char delimiter, bool includeHeader, CancellationToken ct);
     Task<(string Content, string ContentType, string FileName)?> LoadAsync(Guid runId, string nodeId, CancellationToken ct);
 }
 
@@ -20,22 +20,22 @@ public class LocalArtifactStore : IArtifactStore
         _root = Path.Combine(AppContext.BaseDirectory, "artifacts");
     }
 
-    public async Task<string> SaveAsync(Guid runId, string nodeId, Dataset dataset, string format, CancellationToken ct)
+    public async Task<string> SaveAsync(Guid runId, string nodeId, Dataset dataset, string format, string? fileName, char delimiter, bool includeHeader, CancellationToken ct)
     {
         var safeNode = MakeSafe(nodeId);
         var dir = Path.Combine(_root, runId.ToString("N"));
         Directory.CreateDirectory(dir);
 
-        string fileName, content, contentType;
+        string actualName, content, contentType;
         if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
         {
-            fileName = safeNode + ".csv";
-            content = ToCsv(dataset);
+            actualName = string.IsNullOrWhiteSpace(fileName) ? safeNode + ".csv" : EnsureExtension(MakeSafe(fileName), ".csv");
+            content = ToCsv(dataset, delimiter, includeHeader);
             contentType = "text/csv";
         }
         else
         {
-            fileName = safeNode + ".json";
+            actualName = string.IsNullOrWhiteSpace(fileName) ? safeNode + ".json" : EnsureExtension(MakeSafe(fileName), ".json");
             content = dataset.ToJson();
             contentType = "application/json";
         }
@@ -44,27 +44,53 @@ public class LocalArtifactStore : IArtifactStore
         if (bytes.Length > MaxArtifactBytes)
             throw new InvalidOperationException($"Output too large ({bytes.Length} bytes, max {MaxArtifactBytes})");
 
-        var path = Path.Combine(dir, fileName);
+        var path = Path.Combine(dir, actualName);
         await File.WriteAllTextAsync(path, content, Encoding.UTF8, ct);
-        return fileName;
+        if (!actualName.Equals(safeNode + (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase) ? ".csv" : ".json"), StringComparison.OrdinalIgnoreCase))
+            await File.WriteAllTextAsync(Path.Combine(dir, safeNode + ".ref"), actualName, ct);
+        return actualName;
     }
 
     public async Task<(string Content, string ContentType, string FileName)?> LoadAsync(Guid runId, string nodeId, CancellationToken ct)
     {
         var dir = Path.Combine(_root, runId.ToString("N"));
-        var safeNode = MakeSafe(nodeId);
+        if (!Directory.Exists(dir))
+            return null;
 
-        foreach (var ext in new[] { ".json", ".csv" })
+        var safeNode = MakeSafe(nodeId);
+        var refPath = Path.Combine(dir, safeNode + ".ref");
+        if (File.Exists(refPath))
         {
-            var path = Path.Combine(dir, safeNode + ext);
-            if (File.Exists(path))
-            {
-                var content = await File.ReadAllTextAsync(path, ct);
-                return (content, ext == ".csv" ? "text/csv" : "application/json", safeNode + ext);
-            }
+            var referenced = (await File.ReadAllTextAsync(refPath, ct)).Trim();
+            var refFull = Path.Combine(dir, Path.GetFileName(referenced));
+            if (File.Exists(refFull) && IsDataFile(refFull))
+                return await ReadDataFile(refFull, ct);
         }
 
-        return null;
+        var match = Directory.GetFiles(dir)
+            .Select(p => new FileInfo(p))
+            .Where(f => IsDataFile(f.FullName)
+                && f.Name.StartsWith(safeNode + ".", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(f => f.LastWriteTimeUtc)
+            .FirstOrDefault();
+
+        if (match is null)
+            return null;
+
+        return await ReadDataFile(match.FullName, ct);
+    }
+
+    private static bool IsDataFile(string path)
+    {
+        var ext = Path.GetExtension(path);
+        return ext.Equals(".json", StringComparison.OrdinalIgnoreCase) || ext.Equals(".csv", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task<(string Content, string ContentType, string FileName)?> ReadDataFile(string path, CancellationToken ct)
+    {
+        var content = await File.ReadAllTextAsync(path, ct);
+        var name = Path.GetFileName(path);
+        return (content, Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase) ? "text/csv" : "application/json", name);
     }
 
     private static string MakeSafe(string nodeId)
@@ -72,33 +98,38 @@ public class LocalArtifactStore : IArtifactStore
         var sb = new StringBuilder();
         foreach (var ch in nodeId)
         {
-            if (char.IsLetterOrDigit(ch) || ch == '-' || ch == '_')
+            if (char.IsLetterOrDigit(ch) || ch == '-' || ch == '_' || ch == '.')
                 sb.Append(ch);
             else
                 sb.Append('_');
         }
-        var safe = sb.ToString().Trim('_');
+        var safe = sb.ToString().Trim('_', '.');
         return string.IsNullOrEmpty(safe) ? "node" : safe[..Math.Min(safe.Length, 80)];
     }
 
-    private static string ToCsv(Dataset dataset)
+    private static string EnsureExtension(string name, string ext)
+        => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase) ? name : name + ext;
+
+    private static string ToCsv(Dataset dataset, char delimiter, bool includeHeader)
     {
+        var sep = delimiter.ToString();
         var sb = new StringBuilder();
-        sb.AppendLine(string.Join(",", dataset.Columns.Select(Escape)));
+        if (includeHeader)
+            sb.AppendLine(string.Join(sep, dataset.Columns.Select(c => Escape(c, delimiter))));
         foreach (var row in dataset.Rows)
         {
             var cells = new string[dataset.Columns.Count];
             for (var i = 0; i < cells.Length; i++)
-                cells[i] = Escape(i < row.Count ? row[i] : null);
-            sb.AppendLine(string.Join(",", cells));
+                cells[i] = Escape(i < row.Count ? row[i] : null, delimiter);
+            sb.AppendLine(string.Join(sep, cells));
         }
         return sb.ToString();
     }
 
-    private static string Escape(string? value)
+    private static string Escape(string? value, char delimiter)
     {
         if (value is null) return string.Empty;
-        if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
+        if (value.Contains('"') || value.Contains(delimiter) || value.Contains('\n') || value.Contains('\r'))
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         return value;
     }

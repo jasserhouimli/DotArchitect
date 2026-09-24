@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using Reflow.Infrastructure;
 using Reflow.Infrastructure.Middleware;
 using Reflow.Modules.Identity;
 using Reflow.Modules.WorkflowDesign;
@@ -19,6 +20,8 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+builder.Services.AddReflowInfrastructure();
 
 IdentityModule.Register(builder);
 WorkflowDesignModule.Register(builder);

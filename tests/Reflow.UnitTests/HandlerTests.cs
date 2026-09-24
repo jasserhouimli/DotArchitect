@@ -1,4 +1,5 @@
-using Reflow.Modules.WorkflowExecution.Data;
+using Reflow.Infrastructure.Data;
+using Reflow.Infrastructure.Storage;
 using Reflow.Modules.WorkflowExecution.Handlers;
 using Reflow.Modules.WorkflowExecution.Services;
 using Xunit;
@@ -8,7 +9,9 @@ namespace Reflow.UnitTests;
 public class HandlerTests
 {
     private static TaskExecutionContext Ctx(string nodeId, string nodeType, string config, params Dataset[] inputs)
-        => new(Guid.NewGuid(), Guid.NewGuid(), nodeId, nodeType, config, inputs);
+        => new(Guid.NewGuid(), Guid.NewGuid(), nodeId, nodeType, config, inputs, Guid.NewGuid());
+
+    private static FakeUploadStore Uploads() => new();
 
     private static Dataset Table(params string[][] rows)
     {
@@ -29,7 +32,7 @@ public class HandlerTests
     [Fact]
     public async Task CsvRead_ParsesRows()
     {
-        var handler = new CsvReadHandler();
+        var handler = new CsvReadHandler(Uploads());
 
         var result = await handler.ExecuteAsync(
             Ctx("read", "data.csv.read", """{"csvText":"a,b\n1,2\n3,4"}"""), CancellationToken.None);
@@ -42,7 +45,7 @@ public class HandlerTests
     [Fact]
     public async Task CsvRead_DedupesConfiguredColumns()
     {
-        var handler = new CsvReadHandler();
+        var handler = new CsvReadHandler(Uploads());
 
         var result = await handler.ExecuteAsync(
             Ctx("read", "data.csv.read", """{"csvText":"a\n1\n1\n2","dedupeColumns":["a"]}"""), CancellationToken.None);
@@ -55,7 +58,7 @@ public class HandlerTests
     [Fact]
     public async Task CsvRead_MissingText_Fails()
     {
-        var handler = new CsvReadHandler();
+        var handler = new CsvReadHandler(Uploads());
 
         var result = await handler.ExecuteAsync(
             Ctx("read", "data.csv.read", "{}"), CancellationToken.None);
@@ -268,11 +271,277 @@ public class HandlerTests
         await SsrfGuard.AssertSafeAsync("https://8.8.8.8/dns", false, CancellationToken.None);
     }
 
+    [Fact]
+    public void JsonNavigator_ResolvesNestedPaths()
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse("""{"data":{"orders":[{"id":1},{"id":2}]}}""");
+
+        Assert.True(JsonNavigator.TryNavigate(doc.RootElement, "data.orders", out var target, out _));
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, target.ValueKind);
+        Assert.True(JsonNavigator.TryNavigate(doc.RootElement, "data.orders.1.id", out var id, out _));
+        Assert.Equal(2, id.GetInt32());
+        Assert.True(JsonNavigator.TryNavigate(doc.RootElement, null, out _, out _));
+        Assert.False(JsonNavigator.TryNavigate(doc.RootElement, "data.missing", out _, out var error));
+        Assert.Contains("missing", error);
+        Assert.False(JsonNavigator.TryNavigate(doc.RootElement, "data.orders.9", out _, out _));
+    }
+
+    [Fact]
+    public void JsonDataset_SelectsRootPath()
+    {
+        var dataset = JsonDataset.FromJsonText("""{"data":{"rows":[{"a":"1"}]}}""", "data.rows", "test");
+
+        Assert.Equal(new[] { "a" }, dataset.Columns);
+        Assert.Single(dataset.Rows);
+    }
+
+    [Fact]
+    public async Task CsvRead_FromUpload()
+    {
+        var uploads = Uploads();
+        var fileId = $"{new Guid():N}.csv".Replace("-", "");
+        uploads.Add(fileId, "x,y\n1,2\n3,4");
+        var handler = new CsvReadHandler(uploads);
+
+        var result = await handler.ExecuteAsync(
+            Ctx("read", "data.csv.read", $$"""{"source":"upload","fileId":"{{fileId}}"}"""), CancellationToken.None);
+
+        Assert.Equal(2, OutputOf(result).Rows.Count);
+    }
+
+    [Fact]
+    public async Task CsvRead_MissingUpload_Fails()
+    {
+        var handler = new CsvReadHandler(Uploads());
+
+        var result = await handler.ExecuteAsync(
+            Ctx("read", "data.csv.read", """{"source":"upload","fileId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.csv"}"""),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("no longer exists", result.Error);
+    }
+
+    [Fact]
+    public async Task CsvRead_TrimSkipAndNulls()
+    {
+        var handler = new CsvReadHandler(Uploads());
+
+        var result = await handler.ExecuteAsync(
+            Ctx("read", "data.csv.read",
+                """{"csvText":"a,b\nskip,me\n x ,NA\n1,2","skipRows":1,"nullValues":["NA"]}"""),
+            CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Equal(2, output.Rows.Count);
+        Assert.Equal("x", output.Rows[0][0]);
+        Assert.Null(output.Rows[0][1]);
+    }
+
+    [Fact]
+    public async Task JsonRead_ParsesTextAndRootPath()
+    {
+        var handler = new JsonReadHandler(Uploads());
+
+        var result = await handler.ExecuteAsync(
+            Ctx("j", "data.json.read", """{"jsonText":"{\"items\":[{\"a\":1},{\"a\":2}]}","rootPath":"items"}"""),
+            CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Equal(2, output.Rows.Count);
+        Assert.Equal("2", output.Rows[1][0]);
+    }
+
+    [Fact]
+    public async Task Validate_TypesAndUnique()
+    {
+        var handler = new ValidateHandler();
+        var input = Table(new[] { "age", "code" }, new[] { "36", "A" }, new[] { "old", "B" }, new[] { "40", "A" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("val", "data.validate", """{"columnTypes":{"age":"integer"},"uniqueColumns":["code"]}""", input),
+            CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Single(output.Rows);
+        Assert.Equal(2, output.Quality.RejectedCount);
+        Assert.Equal(1, output.Quality.FailuresByRule["type:age"]);
+        Assert.Equal(1, output.Quality.FailuresByRule["unique:code"]);
+    }
+
+    [Theory]
+    [InlineData("startsWith", "Ad", 1)]
+    [InlineData("endsWith", "da", 1)]
+    [InlineData("matches", "^A.*a$", 2)]
+    [InlineData("inList", null, 2)]
+    public async Task Filter_NewOperatorsWork(string op, string? value, int expected)
+    {
+        var handler = new FilterHandler();
+        var input = Table(new[] { "name" }, new[] { "Ada" }, new[] { "Bob" }, new[] { "Ava" });
+        var config = op == "inList"
+            ? """{"column":"name","operator":"inList","value":["Ada","Ava"]}"""
+            : $$"""{"column":"name","operator":"{{op}}","value":"{{value}}"}""";
+
+        var result = await handler.ExecuteAsync(Ctx("flt", "data.filter", config, input), CancellationToken.None);
+
+        Assert.Equal(expected, OutputOf(result).Rows.Count);
+    }
+
+    [Fact]
+    public async Task Filter_BadPattern_Fails()
+    {
+        var handler = new FilterHandler();
+        var input = Table(new[] { "x" }, new[] { "abc" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("flt", "data.filter", """{"column":"x","operator":"matches","value":"([unclosed"}""", input),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("pattern", result.Error);
+    }
+
+    [Fact]
+    public async Task Transform_DropFillRoundConcat()
+    {
+        var handler = new TransformHandler();
+        var input = Table(new[] { "a", "b", "c" }, new[] { "x", "10.567", null }, new[] { "y", "2", "z" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("tr", "data.transform",
+                """{"dropColumns":["c"],"fillNull":{"b":"0"},"round":{"b":1},"concat":{"sources":["a","b"],"separator":"-","alias":"combo"}}""",
+                input),
+            CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Equal(new[] { "a", "b", "combo" }, output.Columns);
+        Assert.Equal("10.6", output.Rows[0][1]);
+        Assert.Equal("x-10.6", output.Rows[0][2]);
+    }
+
+    [Fact]
+    public async Task Aggregate_MedianAndDistinct()
+    {
+        var handler = new AggregateHandler();
+        var input = Table(new[] { "g", "v" }, new[] { "a", "1" }, new[] { "a", "2" }, new[] { "a", "2" }, new[] { "b", "5" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("agg", "data.aggregate",
+                """{"groupBy":["g"],"operations":[{"column":"v","operation":"median","alias":"med"},{"column":"v","operation":"countDistinct","alias":"d"}]}""",
+                input),
+            CancellationToken.None);
+
+        var output = OutputOf(result);
+        var rowA = output.Rows.Single(r => r[0] == "a");
+        Assert.Equal("2", rowA[1]);
+        Assert.Equal("2", rowA[2]);
+    }
+
+    [Fact]
+    public async Task Sort_OrdersNumericallyThenLexically()
+    {
+        var handler = new SortHandler();
+        var input = Table(new[] { "n", "s" }, new[] { "10", "b" }, new[] { "2", "a" }, new[] { "2", "c" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("sort", "data.sort", """{"orderBy":[{"column":"n","direction":"asc"},{"column":"s","direction":"desc"}]}""", input),
+            CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Equal("c", output.Rows[0][1]);
+        Assert.Equal("a", output.Rows[1][1]);
+        Assert.Equal("b", output.Rows[2][1]);
+    }
+
+    [Fact]
+    public async Task Limit_SkipsAndTakes()
+    {
+        var handler = new LimitHandler();
+        var input = Table(new[] { "a" }, new[] { "1" }, new[] { "2" }, new[] { "3" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("lim", "data.limit", """{"offset":1,"count":1}""", input), CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Single(output.Rows);
+        Assert.Equal("2", output.Rows[0][0]);
+    }
+
+    [Fact]
+    public async Task Dedupe_RemovesDuplicates()
+    {
+        var handler = new DedupeHandler();
+        var input = Table(new[] { "a", "b" }, new[] { "1", "x" }, new[] { "1", "y" }, new[] { "1", "x" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("dd", "data.dedupe", """{"columns":["a","b"]}""", input), CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Equal(2, output.Rows.Count);
+        Assert.Equal(1, output.Quality.DuplicateCount);
+    }
+
+    [Fact]
+    public async Task Join_InnerAndLeft()
+    {
+        var handler = new JoinHandler();
+        var left = Table(new[] { "id", "name" }, new[] { "1", "Ada" }, new[] { "2", "Bob" });
+        var right = Table(new[] { "id", "city" }, new[] { "1", "Tunis" }, new[] { "3", "Paris" });
+
+        var inner = await handler.ExecuteAsync(
+            Ctx("j", "data.join", """{"on":["id"],"how":"inner"}""", left, right), CancellationToken.None);
+        var innerOut = OutputOf(inner);
+        Assert.Single(innerOut.Rows);
+        Assert.Equal(new[] { "id", "name", "city" }, innerOut.Columns);
+
+        var outer = await handler.ExecuteAsync(
+            Ctx("j", "data.join", """{"on":["id"],"how":"left"}""", left, right), CancellationToken.None);
+        var outerOut = OutputOf(outer);
+        Assert.Equal(2, outerOut.Rows.Count);
+        Assert.Null(outerOut.Rows[1][2]);
+    }
+
+    [Fact]
+    public async Task Join_RequiresTwoInputs()
+    {
+        var handler = new JoinHandler();
+        var input = Table(new[] { "a" }, new[] { "1" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("j", "data.join", """{"on":["a"]}""", input), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("two inputs", result.Error);
+    }
+
+    [Fact]
+    public async Task Profile_ComputesStats()
+    {
+        var handler = new ProfileHandler();
+        var input = Table(new[] { "age", "name" }, new[] { "10", "Ada" }, new[] { "20", null }, new[] { "xx", "Ada" });
+
+        var result = await handler.ExecuteAsync(
+            Ctx("p", "data.profile", "{}", input), CancellationToken.None);
+
+        var output = OutputOf(result);
+        Assert.Equal(2, output.Rows.Count);
+        var age = output.Rows.Single(r => r[0] == "age");
+        Assert.Equal("3", age[1]);
+        Assert.Equal("0", age[2]);
+        Assert.Equal("3", age[3]);
+        Assert.Equal("10", age[4]);
+        Assert.Equal("20", age[5]);
+        Assert.Equal("15", age[6]);
+        var name = output.Rows.Single(r => r[0] == "name");
+        Assert.Equal("1", name[2]);
+        Assert.Equal("1", name[3]);
+    }
+
     private sealed class FakeArtifactStore : IArtifactStore
     {
         public List<(string Format, string Content)> Saved { get; } = new();
 
-        public Task<string> SaveAsync(Guid runId, string nodeId, Dataset dataset, string format, CancellationToken ct)
+        public Task<string> SaveAsync(Guid runId, string nodeId, Dataset dataset, string format, string? fileName, char delimiter, bool includeHeader, CancellationToken ct)
         {
             var content = format == "csv" ? "csv-stub" : dataset.ToJson();
             if (format == "csv")
@@ -283,5 +552,26 @@ public class HandlerTests
 
         public Task<(string Content, string ContentType, string FileName)?> LoadAsync(Guid runId, string nodeId, CancellationToken ct)
             => Task.FromResult<(string, string, string)?>(null);
+    }
+
+    private sealed class FakeUploadStore : IUploadStore
+    {
+        public Dictionary<string, string> Files { get; } = new();
+
+        public void Add(string fileId, string content) => Files[fileId] = content;
+
+        public Task<UploadedFile> SaveAsync(Guid workflowId, string fileName, Stream content, CancellationToken ct)
+            => throw new NotImplementedException();
+
+        public Task<IReadOnlyList<UploadedFile>> ListAsync(Guid workflowId, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<UploadedFile>>(new List<UploadedFile>());
+
+        public Task<bool> DeleteAsync(Guid workflowId, string fileId, CancellationToken ct)
+            => Task.FromResult(Files.Remove(fileId));
+
+        public Task<string?> ReadTextAsync(Guid workflowId, string fileId, CancellationToken ct)
+            => Task.FromResult<string?>(Files.TryGetValue(fileId, out var text) ? text : null);
+
+        public bool IsValidFileId(string fileId) => LocalUploadStore.IsValidFileId(fileId);
     }
 }

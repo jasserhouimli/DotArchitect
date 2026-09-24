@@ -145,4 +145,42 @@ public class WorkflowValidatorTests
 
         Assert.True(result.IsValid);
     }
+
+    [Theory]
+    [InlineData("data.json.read", "{}", "jsonText")]
+    [InlineData("data.csv.read", """{"source":"upload"}""", "fileId")]
+    [InlineData("data.sort", "{}", "orderBy")]
+    [InlineData("data.limit", "{}", "count")]
+    [InlineData("data.join", "{}", "leftOn")]
+    [InlineData("data.join", """{"on":[]}""", "'on'")]
+    [InlineData("data.filter", """{"column":"a","operator":"inList","value":"x"}""", "non-empty array")]
+    [InlineData("data.transform", """{"select":["a"],"dropColumns":["b"]}""", "cannot combine")]
+    [InlineData("http.request", """{"url":"https://x.test","headers":{"authorization":"t"}}""", "not allowed")]
+    [InlineData("http.request", """{"url":"https://x.test","pagination":{"maxPages":99}}""", "maxPages")]
+    [InlineData("data.output", """{"fileName":"../evil"}""", "safe file name")]
+    public void NewConfigRules_ProduceErrors(string type, string config, string expectedFragment)
+    {
+        var result = WorkflowValidator.Validate(new[] { Node("n1", type, config) }, []);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains(expectedFragment));
+    }
+
+    [Theory]
+    [InlineData("data.json.read", """{"jsonText":"[1]","rootPath":"a.b.0"}""")]
+    [InlineData("data.sort", """{"orderBy":[{"column":"a","direction":"desc"}]}""")]
+    [InlineData("data.limit", """{"offset":5,"count":10}""")]
+    [InlineData("data.dedupe", """{"columns":["a"]}""")]
+    [InlineData("data.join", """{"on":["id"],"how":"left"}""")]
+    [InlineData("data.join", """{"leftOn":["a"],"rightOn":["b"]}""")]
+    [InlineData("data.profile", "{}")]
+    [InlineData("data.validate", """{"columnTypes":{"n":"integer"},"uniqueColumns":["id"]}""")]
+    [InlineData("data.transform", """{"dropColumns":["x"],"fillNull":{"y":"0"},"round":{"n":2}}""")]
+    [InlineData("data.output", """{"format":"csv","fileName":"report","delimiter":";"}""")]
+    public void NewWellFormedConfigs_Pass(string type, string config)
+    {
+        var result = WorkflowValidator.Validate(new[] { Node("n1", type, config) }, []);
+
+        Assert.True(result.IsValid);
+    }
 }

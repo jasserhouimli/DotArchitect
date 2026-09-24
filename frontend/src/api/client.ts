@@ -99,7 +99,18 @@ export const workflows = {
   archive: (id: string) => request<{ message: string }>(`/workflows/${id}/archive`, { method: 'POST' }),
   versions: (id: string) => request<WorkflowVersion[]>(`/workflows/${id}/versions`),
   version: (id: string, n: number) => request<WorkflowVersionDetail>(`/workflows/${id}/versions/${n}`),
+  uploadFile: (id: string, file: File) => {
+    const form = new FormData()
+    form.append("file", file)
+    return request<WorkflowFile>(`/workflows/${id}/files`, { method: 'POST', body: form })
+  },
+  listFiles: (id: string) => request<WorkflowFile[]>(`/workflows/${id}/files`),
+  deleteFile: (id: string, fileId: string) => request<void>(`/workflows/${id}/files/${fileId}`, { method: 'DELETE' }),
 };
+
+export interface WorkflowFile {
+  fileId: string; fileName: string; size: number; rows: number; columns: string[]; uploadedAt: string;
+}
 
 export interface WorkflowRun {
   id: string; workflowId: string; versionNumber: number; status: number;

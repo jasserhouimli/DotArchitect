@@ -9,14 +9,23 @@ import { Input } from "@/components/ui/input"
 import { NodeConfigForm, defaultConfig, parseConfig } from "@/components/NodeConfigForm"
 
 const NODE_TYPES = [
-  { type: "http.request", label: "HTTP Request", color: "#3b82f6" },
   { type: "data.csv.read", label: "CSV Read", color: "#10b981" },
+  { type: "data.json.read", label: "JSON Read", color: "#14b8a6" },
+  { type: "http.request", label: "HTTP Request", color: "#3b82f6" },
   { type: "data.validate", label: "Validate", color: "#f59e0b" },
   { type: "data.filter", label: "Filter", color: "#8b5cf6" },
+  { type: "data.sort", label: "Sort", color: "#f97316" },
+  { type: "data.limit", label: "Limit", color: "#78716c" },
   { type: "data.transform", label: "Transform", color: "#ec4899" },
+  { type: "data.dedupe", label: "Dedupe", color: "#84cc16" },
+  { type: "data.join", label: "Join", color: "#d946ef" },
   { type: "data.aggregate", label: "Aggregate", color: "#06b6d4" },
+  { type: "data.profile", label: "Profile", color: "#6366f1" },
   { type: "data.output", label: "Output", color: "#64748b" },
 ]
+
+const NODE_W = 144
+const NODE_H = 56
 
 interface WorkflowEditorProps {
   workflowId: string
@@ -42,8 +51,10 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
   const [workflow, setWorkflow] = useState<WorkflowDetail | null>(null)
   const [nodes, setNodes] = useState<WorkflowNode[]>([])
   const [edges, setEdges] = useState<WorkflowEdge[]>([])
-  const [selectedNode, setSelectedNode] = useState<string | null>(null)
-  const [connectFrom, setConnectFrom] = useState<string | null>(null)
+  const [selectedNodes, setSelectedNodes] = useState<string[]>([])
+  const selectedNode = selectedNodes.length > 0 ? selectedNodes[selectedNodes.length - 1] : null
+  const [pendingEdge, setPendingEdge] = useState<{ from: string; x: number; y: number } | null>(null)
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
   const [validation, setValidation] = useState<{ isValid: boolean; errors: string[]; warnings: string[] } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -58,8 +69,15 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
   const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null)
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const canvasRef = useRef<HTMLDivElement>(null)
-  const [dragging, setDragging] = useState<string | null>(null)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const dragRef = useRef<{ ids: { id: string; origX: number; origY: number }[]; startX: number; startY: number; moved: boolean } | null>(null)
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const marqueeRef = useRef<{ x0: number; y0: number; additive: boolean } | null>(null)
+  const [view, setView] = useState({ x: 0, y: 0, k: 1 })
+  const panRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ sx: number; sy: number; wx: number; wy: number; nodeId: string | null } | null>(null)
+
+  const snap = (v: number) => Math.round(v / 10) * 10
 
   const load = useCallback(() => workflows.get(workflowId).then(w => {
     setWorkflow(w)
@@ -77,46 +95,301 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
       positionX: 200 + Math.random() * 200, positionY: 100 + Math.random() * 200
     }
     setNodes(prev => [...prev, newNode])
-    setSelectedNode(id)
+    setSelectedNodes([id])
+  }
+
+  const removeNodes = (ids: string[]) => {
+    if (ids.length === 0) return
+    const gone = new Set(ids)
+    setNodes(prev => prev.filter(n => !gone.has(n.nodeId)))
+    setEdges(prev => prev.filter(e => !gone.has(e.sourceNodeId) && !gone.has(e.targetNodeId)))
+    setSelectedNodes(prev => prev.filter(id => !gone.has(id)))
+    setSelectedEdge(prev => {
+      if (!prev) return prev
+      const [s, t] = prev.split("|||")
+      return gone.has(s) || gone.has(t) ? null : prev
+    })
   }
 
   const removeNode = (nodeId: string) => {
-    setNodes(prev => prev.filter(n => n.nodeId !== nodeId))
-    setEdges(prev => prev.filter(e => e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId))
-    if (selectedNode === nodeId) setSelectedNode(null)
+    removeNodes([nodeId])
   }
 
   const updateNodeConfig = (nodeId: string, config: Record<string, unknown>) => {
     setNodes(prev => prev.map(n => n.nodeId === nodeId ? { ...n, configJson: JSON.stringify(config) } : n))
   }
 
-  const handleMouseDown = (nodeId: string, e: React.MouseEvent) => {
+  const isArchived = () => workflow?.status === "Archived"
+
+  const canvasPoint = (clientX: number, clientY: number) => {
+    const rect = canvasRef.current!.getBoundingClientRect()
+    return { x: (clientX - rect.left - view.x) / view.k, y: (clientY - rect.top - view.y) / view.k }
+  }
+
+  const onNodeMouseDown = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (connectFrom) {
-      if (connectFrom !== nodeId && !edges.some(ed => ed.sourceNodeId === connectFrom && ed.targetNodeId === nodeId)) {
-        setEdges(prev => [...prev, { sourceNodeId: connectFrom, targetNodeId: nodeId }])
+    if (isArchived()) return
+    const node = nodes.find(n => n.nodeId === nodeId)
+    if (!node) return
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      // Toggle membership in the selection, no drag
+      setSelectedNodes(prev => prev.includes(nodeId) ? prev.filter(id => id !== nodeId) : [...prev, nodeId])
+      setSelectedEdge(null)
+      return
+    }
+    // Dragging a selected node moves the whole group; otherwise select just this one
+    const group = selectedNodes.includes(nodeId) ? selectedNodes : [nodeId]
+    if (!selectedNodes.includes(nodeId)) {
+      setSelectedNodes([nodeId])
+    }
+    setSelectedEdge(null)
+    dragRef.current = {
+      ids: group.map(id => {
+        const n = nodes.find(x => x.nodeId === id)!
+        return { id, origX: n.positionX, origY: n.positionY }
+      }),
+      startX: e.clientX, startY: e.clientY, moved: false,
+    }
+    setDraggingId(nodeId)
+  }
+
+  const onNodeMouseUp = (nodeId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    // Releasing a rubber band over a node finalizes the marquee (canvas mouseup never fires here)
+    if (marqueeRef.current) {
+      finishMarquee()
+      dragRef.current = null
+      setDraggingId(null)
+      return
+    }
+    // A press without movement is a click -> select only this node (settings stay open)
+    if (dragRef.current && dragRef.current.ids.some(x => x.id === nodeId)) {
+      if (!dragRef.current.moved) {
+        if (!(e.shiftKey || e.ctrlKey || e.metaKey)) {
+          setSelectedNodes([nodeId])
+        }
+        setSelectedEdge(null)
+      } else {
+        // Snap every moved node to grid on drop
+        const movedIds = new Set(dragRef.current.ids.map(x => x.id))
+        setNodes(prev => prev.map(n => movedIds.has(n.nodeId)
+          ? { ...n, positionX: snap(n.positionX), positionY: snap(n.positionY) }
+          : n))
       }
-      setConnectFrom(null)
-    } else {
-      setSelectedNode(nodeId)
-      const node = nodes.find(n => n.nodeId === nodeId)
-      if (node) {
+    }
+    dragRef.current = null
+    setDraggingId(null)
+  }
+
+  const onCanvasMouseDown = (e: React.MouseEvent) => {
+    // Empty canvas or svg background (node/port presses stop propagation and never reach here)
+    const t = e.target as Element
+    if (e.target === e.currentTarget || t.tagName === "svg") {
+      if (e.shiftKey && !isArchived()) {
+        // Rubber-band selection (additive while Shift is held)
         const rect = canvasRef.current!.getBoundingClientRect()
-        setDragOffset({ x: e.clientX - rect.left - node.positionX, y: e.clientY - rect.top - node.positionY })
-        setDragging(nodeId)
+        const sx = e.clientX - rect.left, sy = e.clientY - rect.top
+        marqueeRef.current = { x0: sx, y0: sy, additive: true }
+        setMarquee({ x: sx, y: sy, w: 0, h: 0 })
+        return
       }
+      setSelectedNodes([])
+      setSelectedEdge(null)
+      setPendingEdge(null)
+      setCtxMenu(null)
+      marqueeRef.current = null
+      setMarquee(null)
+      panRef.current = { startX: e.clientX, startY: e.clientY, origX: view.x, origY: view.y }
     }
   }
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragging) return
-    const rect = canvasRef.current!.getBoundingClientRect()
-    const x = e.clientX - rect.left - dragOffset.x
-    const y = e.clientY - rect.top - dragOffset.y
-    setNodes(prev => prev.map(n => n.nodeId === dragging ? { ...n, positionX: Math.max(0, x), positionY: Math.max(0, y) } : n))
-  }, [dragging, dragOffset])
+  const onCanvasMouseMove = (e: React.MouseEvent) => {
+    if (marqueeRef.current) {
+      const rect = canvasRef.current!.getBoundingClientRect()
+      const cx = e.clientX - rect.left, cy = e.clientY - rect.top
+      const { x0, y0 } = marqueeRef.current
+      setMarquee({ x: Math.min(x0, cx), y: Math.min(y0, cy), w: Math.abs(cx - x0), h: Math.abs(cy - y0) })
+      return
+    }
+    if (panRef.current) {
+      const p = panRef.current
+      setView(v => ({ ...v, x: p.origX + (e.clientX - p.startX), y: p.origY + (e.clientY - p.startY) }))
+    }
+    if (dragRef.current) {
+      const dx = (e.clientX - dragRef.current.startX) / view.k
+      const dy = (e.clientY - dragRef.current.startY) / view.k
+      if (Math.abs(dx) + Math.abs(dy) > 4) dragRef.current.moved = true
+      if (dragRef.current.moved) {
+        const moves = new Map(dragRef.current.ids.map(x => [x.id, x]))
+        setNodes(prev => prev.map(n => {
+          const o = moves.get(n.nodeId)
+          return o ? { ...n, positionX: Math.max(0, o.origX + dx), positionY: Math.max(0, o.origY + dy) } : n
+        }))
+      }
+    }
+    if (pendingEdge) {
+      const p = canvasPoint(e.clientX, e.clientY)
+      setPendingEdge(prev => prev ? { ...prev, x: p.x, y: p.y } : prev)
+    }
+  }
 
-  const handleMouseUp = () => setDragging(null)
+  const finishMarquee = () => {
+    // Capture everything up front: state updaters run later, after refs may change
+    const m = marqueeRef.current
+    const mq = marquee
+    marqueeRef.current = null
+    setMarquee(null)
+    if (!m || !mq || mq.w + mq.h < 4) return
+    const x0 = (mq.x - view.x) / view.k
+    const y0 = (mq.y - view.y) / view.k
+    const x1 = (mq.x + mq.w - view.x) / view.k
+    const y1 = (mq.y + mq.h - view.y) / view.k
+    const hit = nodes
+      .filter(n => n.positionX < x1 && n.positionX + NODE_W > x0 && n.positionY < y1 && n.positionY + NODE_H > y0)
+      .map(n => n.nodeId)
+    if (m.additive) {
+      setSelectedNodes(prev => Array.from(new Set([...prev, ...hit])))
+    } else {
+      setSelectedNodes(hit)
+    }
+    setSelectedEdge(null)
+  }
+
+  const onCanvasMouseUp = () => {
+    // Releasing over empty canvas cancels a pending connection
+    if (pendingEdge) setPendingEdge(null)
+    finishMarquee()
+    panRef.current = null
+    dragRef.current = null
+    setDraggingId(null)
+  }
+
+  const zoomAt = (clientX: number, clientY: number, nk: number) => {
+    const k = Math.min(1.75, Math.max(0.4, nk))
+    const rect = canvasRef.current!.getBoundingClientRect()
+    const cx = clientX - rect.left, cy = clientY - rect.top
+    setView(v => {
+      const wx = (cx - v.x) / v.k, wy = (cy - v.y) / v.k
+      return { k, x: cx - wx * k, y: cy - wy * k }
+    })
+  }
+
+  const zoomBy = (f: number) => {
+    const rect = canvasRef.current!.getBoundingClientRect()
+    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, view.k * f)
+  }
+
+  const openCanvasMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (isArchived()) return
+    const p = canvasPoint(e.clientX, e.clientY)
+    setCtxMenu({
+      sx: Math.min(e.clientX, window.innerWidth - 240),
+      sy: Math.min(e.clientY, window.innerHeight - 340),
+      wx: Math.max(0, p.x), wy: Math.max(0, p.y), nodeId: null,
+    })
+  }
+
+  const openNodeMenu = (nodeId: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setSelectedNodes([nodeId])
+    setCtxMenu({
+      sx: Math.min(e.clientX, window.innerWidth - 220),
+      sy: Math.min(e.clientY, window.innerHeight - 160),
+      wx: 0, wy: 0, nodeId,
+    })
+  }
+
+  const addNodeAt = (type: string, x: number, y: number) => {
+    const id = `node-${Date.now()}`
+    setNodes(prev => [...prev, {
+      nodeId: id, nodeType: type, configJson: JSON.stringify(defaultConfig(type)),
+      label: NODE_TYPES.find(n => n.type === type)?.label || type,
+      positionX: snap(Math.max(0, x - NODE_W / 2)), positionY: snap(Math.max(0, y - NODE_H / 2)),
+    }])
+    setSelectedNodes([id])
+  }
+
+  const duplicateNode = (nodeId: string) => {
+    duplicateNodes([nodeId])
+  }
+
+  const duplicateNodes = (ids: string[]) => {
+    if (ids.length === 0 || isArchived()) return
+    const base = Date.now()
+    const copies = nodes
+      .filter(n => ids.includes(n.nodeId))
+      .map((src, i) => ({
+        ...src,
+        nodeId: `node-${base}-${i}`,
+        label: `${src.label || src.nodeType} copy`,
+        positionX: snap(src.positionX + 24),
+        positionY: snap(src.positionY + 24),
+      }))
+    if (copies.length === 0) return
+    setNodes(prev => [...prev, ...copies])
+    setSelectedNodes(copies.map(c => c.nodeId))
+  }
+
+  const startConnection = (nodeId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isArchived()) return
+    const p = canvasPoint(e.clientX, e.clientY)
+    setPendingEdge({ from: nodeId, x: p.x, y: p.y })
+  }
+
+  const finishConnection = (nodeId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (marqueeRef.current) {
+      finishMarquee()
+      return
+    }
+    if (pendingEdge && pendingEdge.from !== nodeId) {
+      const from = pendingEdge.from
+      if (!edges.some(ed => ed.sourceNodeId === from && ed.targetNodeId === nodeId)) {
+        setEdges(prev => [...prev, { sourceNodeId: from, targetNodeId: nodeId }])
+      }
+    }
+    setPendingEdge(null)
+    dragRef.current = null
+    setDraggingId(null)
+  }
+
+  const edgeKey = (source: string, target: string) => `${source}|||${target}`
+
+  const deleteSelectedEdge = () => {
+    if (!selectedEdge) return
+    const [s, t] = selectedEdge.split("|||")
+    setEdges(prev => prev.filter(x => !(x.sourceNodeId === s && x.targetNodeId === t)))
+    setSelectedEdge(null)
+  }
+
+  useEffect(() => {
+    if (tab !== "editor") return
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) return
+      if (e.key === "Escape") {
+        setPendingEdge(null)
+        setSelectedEdge(null)
+        setSelectedNodes([])
+        setCtxMenu(null)
+        marqueeRef.current = null
+        setMarquee(null)
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && !isArchived()) {
+        if (selectedEdge) {
+          deleteSelectedEdge()
+        } else if (selectedNodes.length > 0) {
+          removeNodes(selectedNodes)
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, selectedEdge, selectedNodes])
 
   const save = async () => {
     setSaving(true)
@@ -304,57 +577,184 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
               {nt.label}
             </button>
           ))}
+          <p className="text-[11px] text-muted-foreground px-2 pt-2 leading-relaxed">
+            Right-click canvas to add here · drag empty space to pan · scroll to zoom · Shift+click or Shift+drag to select many · Del removes selection
+          </p>
         </div>
 
-        <div ref={canvasRef} className="flex-1 relative bg-gray-50 overflow-hidden cursor-crosshair"
-          onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onClick={() => { setSelectedNode(null); setConnectFrom(null) }}>
+        <div ref={canvasRef} className="flex-1 relative bg-gray-50 overflow-hidden"
+          style={{ backgroundImage: "radial-gradient(#d1d5db 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+          onMouseDown={onCanvasMouseDown} onMouseMove={onCanvasMouseMove} onMouseUp={onCanvasMouseUp}
+          onWheel={(e) => zoomAt(e.clientX, e.clientY, view.k * Math.exp(-e.deltaY * 0.0015))}
+          onContextMenu={openCanvasMenu}>
 
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
-            {edges.map((e, i) => {
+          <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`, width: 0, height: 0 }}>
+          <svg width={5000} height={5000} className="absolute left-0 top-0 overflow-visible" onMouseDown={() => { setSelectedNodes([]); setSelectedEdge(null); setPendingEdge(null) }}>
+            <defs>
+              <marker id="reflow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+              </marker>
+              <marker id="reflow-arrow-sel" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#0284c7" />
+              </marker>
+              <marker id="reflow-arrow-pending" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
+              </marker>
+            </defs>
+            {edges.map((e) => {
               const src = nodes.find(n => n.nodeId === e.sourceNodeId)
               const tgt = nodes.find(n => n.nodeId === e.targetNodeId)
               if (!src || !tgt) return null
+              const sx = src.positionX + NODE_W, sy = src.positionY + NODE_H / 2
+              const tx = tgt.positionX, ty = tgt.positionY + NODE_H / 2
+              const dx = Math.max(32, Math.abs(tx - sx) / 2)
+              const d = `M ${sx} ${sy} C ${sx + dx} ${sy}, ${tx - dx} ${ty}, ${tx} ${ty}`
+              const key = edgeKey(e.sourceNodeId, e.targetNodeId)
+              const sel = selectedEdge === key
               return (
-                <g key={i}>
-                  <line x1={src.positionX + 40} y1={src.positionY + 20} x2={tgt.positionX + 40} y2={tgt.positionY + 20}
-                    stroke="#94a3b8" strokeWidth="1.5" markerEnd="url(#arrow)" />
+                <g key={key}>
+                  <path d={d} fill="none" stroke={sel ? "#0284c7" : "#64748b"} strokeWidth={sel ? 2.5 : 2}
+                    markerEnd={`url(#${sel ? "reflow-arrow-sel" : "reflow-arrow"})`} />
+                  <path d={d} fill="none" stroke="transparent" strokeWidth={16} className="cursor-pointer"
+                    onClick={(ev) => { ev.stopPropagation(); setSelectedEdge(sel ? null : key); setSelectedNodes([]) }} />
                 </g>
               )
             })}
-            <defs>
-              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
-              </marker>
-            </defs>
+            {pendingEdge && (() => {
+              const src = nodes.find(n => n.nodeId === pendingEdge.from)
+              if (!src) return null
+              const sx = src.positionX + NODE_W, sy = src.positionY + NODE_H / 2
+              const dx = Math.max(32, Math.abs(pendingEdge.x - sx) / 2)
+              const d = `M ${sx} ${sy} C ${sx + dx} ${sy}, ${pendingEdge.x - dx} ${pendingEdge.y}, ${pendingEdge.x} ${pendingEdge.y}`
+              return <path d={d} fill="none" stroke="#d97706" strokeWidth={2} strokeDasharray="6 4" markerEnd="url(#reflow-arrow-pending)" />
+            })()}
           </svg>
 
           {nodes.map(n => {
             const nt = NODE_TYPES.find(t => t.type === n.nodeType)
-            const isSelected = selectedNode === n.nodeId
-            const isConnectSource = connectFrom === n.nodeId
+            const isSelected = selectedNodes.includes(n.nodeId)
             return (
               <div key={n.nodeId}
-                className={`absolute select-none cursor-grab active:cursor-grabbing ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isConnectSource ? 'ring-2 ring-amber-400' : ''}`}
+                className={`absolute select-none ${draggingId === n.nodeId ? "cursor-grabbing z-20" : "cursor-grab"} ${isSelected ? "z-10" : ""}`}
                 style={{ left: n.positionX, top: n.positionY }}
-                onMouseDown={(e) => handleMouseDown(n.nodeId, e)}>
-                <div className="w-20 h-10 rounded border-2 flex items-center justify-center text-[10px] font-medium text-white shadow-sm"
-                  style={{ backgroundColor: nt?.color || '#94a3b8', borderColor: nt?.color || '#94a3b8' }}>
-                  {n.label || n.nodeType}
+                onMouseDown={(e) => onNodeMouseDown(n.nodeId, e)}
+                onMouseUp={(e) => onNodeMouseUp(n.nodeId, e)}
+                onContextMenu={(e) => openNodeMenu(n.nodeId, e)}>
+                <div className="rounded-lg border-2 bg-white shadow-sm hover:shadow-md transition-shadow"
+                  style={{ width: NODE_W, height: NODE_H, borderColor: isSelected ? "#3b82f6" : (nt?.color || "#94a3b8") }}>
+                  <div className="flex items-center gap-1.5 px-2 pt-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: nt?.color || "#94a3b8" }} />
+                    <span className="text-xs font-medium truncate">{n.label || n.nodeType}</span>
+                  </div>
+                  <div className="px-2 pb-1.5 pl-5 text-[10px] font-mono text-muted-foreground truncate">{n.nodeType}</div>
                 </div>
+                <div title="Input — drop a connection here"
+                  className="absolute w-3.5 h-3.5 rounded-full border-2 border-white bg-slate-400 shadow cursor-crosshair hover:bg-slate-600 hover:scale-110 transition-transform"
+                  style={{ left: -7, top: NODE_H / 2 - 7 }}
+                  onMouseDown={(e) => { e.stopPropagation(); if (pendingEdge) finishConnection(n.nodeId, e) }}
+                  onMouseUp={(e) => finishConnection(n.nodeId, e)} />
+                <div title="Output — drag to another node's input to connect"
+                  className="absolute w-3.5 h-3.5 rounded-full border-2 border-white shadow cursor-crosshair hover:scale-125 transition-transform"
+                  style={{ right: -7, top: NODE_H / 2 - 7, backgroundColor: nt?.color || "#94a3b8" }}
+                  onMouseDown={(e) => startConnection(n.nodeId, e)} />
               </div>
             )
           })}
 
-          {connectFrom && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-amber-100 text-amber-700 px-3 py-1 rounded text-sm">
-              Click a target node to connect, or click empty space to cancel
+          {pendingEdge && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-amber-100 text-amber-800 px-3 py-1 rounded text-sm shadow">
+              Drop on another node's <b>left port</b> to connect — click empty space or press Esc to cancel
             </div>
           )}
+          {selectedEdge && !archived && (() => {
+            const e = edges.find(x => edgeKey(x.sourceNodeId, x.targetNodeId) === selectedEdge)
+            const src = e && nodes.find(n => n.nodeId === e.sourceNodeId)
+            const tgt = e && nodes.find(n => n.nodeId === e.targetNodeId)
+            if (!e || !src || !tgt) return null
+            const p0x = src.positionX + NODE_W, p0y = src.positionY + NODE_H / 2
+            const p3x = tgt.positionX, p3y = tgt.positionY + NODE_H / 2
+            const dx = Math.max(32, Math.abs(p3x - p0x) / 2)
+            const mx = (p0x + 3 * (p0x + dx) + 3 * (p3x - dx) + p3x) / 8
+            const my = (p0y + 3 * p0y + 3 * p3y + p3y) / 8
+            return (
+              <button title="Delete connection"
+                className="absolute z-30 w-5 h-5 rounded-full bg-white border shadow text-[11px] leading-none text-red-600 hover:bg-red-50"
+                style={{ left: mx, top: my, transform: "translate(-50%, -50%)" }}
+                onMouseDown={(ev) => ev.stopPropagation()}
+                onClick={(ev) => { ev.stopPropagation(); deleteSelectedEdge() }}>×</button>
+            )
+          })()}
+          </div>
+
+          {marquee && (
+            <div className="absolute z-30 border-2 border-blue-500 bg-blue-500/10 rounded-sm pointer-events-none"
+              style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />
+          )}
+
+          <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-white border rounded shadow px-1 py-0.5 text-xs">
+            <button className="px-1.5 hover:bg-accent rounded" onClick={() => zoomBy(1 / 1.2)} title="Zoom out">−</button>
+            <span className="w-10 text-center text-muted-foreground">{Math.round(view.k * 100)}%</span>
+            <button className="px-1.5 hover:bg-accent rounded" onClick={() => zoomBy(1.2)} title="Zoom in">+</button>
+            <button className="px-1.5 hover:bg-accent rounded text-muted-foreground" onClick={() => setView({ x: 0, y: 0, k: 1 })} title="Reset view">Reset</button>
+          </div>
         </div>
 
-        {selectedNode && (
+        {ctxMenu && (
+          <div className="fixed z-50 w-60 rounded-lg border bg-white shadow-lg py-1 text-sm"
+            style={{ left: ctxMenu.sx, top: ctxMenu.sy }}
+            onMouseDown={(e) => e.stopPropagation()}>
+            {ctxMenu.nodeId ? (
+              <>
+                <div className="px-3 py-1 text-xs font-medium text-muted-foreground">Node actions</div>
+                <button className="flex w-full items-center px-3 py-1.5 text-left hover:bg-accent"
+                  onClick={() => { duplicateNode(ctxMenu.nodeId!); setCtxMenu(null) }}>
+                  ⧉ Duplicate node
+                </button>
+                <button className="flex w-full items-center px-3 py-1.5 text-left text-red-600 hover:bg-accent"
+                  onClick={() => { removeNode(ctxMenu.nodeId!); setCtxMenu(null) }}>
+                  × Delete node
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="px-3 py-1 text-xs font-medium text-muted-foreground">Add node here</div>
+                {NODE_TYPES.map(nt => (
+                  <button key={nt.type} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent"
+                    onClick={() => { addNodeAt(nt.type, ctxMenu.wx, ctxMenu.wy); setCtxMenu(null) }}>
+                    <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: nt.color }} />
+                    <span>{nt.label}</span>
+                    <span className="ml-auto text-[10px] font-mono text-muted-foreground">{nt.type.split(".").pop()}</span>
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        {selectedNodes.length > 1 ? (
           <div className="w-72 border-l p-4 space-y-3 overflow-y-auto">
-            <h3 className="font-semibold text-sm">Node</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">{selectedNodes.length} nodes selected</h3>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setSelectedNodes([])}>×</Button>
+            </div>
+            <div className="text-xs text-muted-foreground space-y-1">
+              {selectedNodes.map(id => {
+                const n = nodes.find(x => x.nodeId === id)
+                return <div key={id} className="truncate">· {n?.label || n?.nodeType || id}</div>
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">Drag any of them to move the group. Settings are edited one node at a time — click a single node.</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => duplicateNodes(selectedNodes)} disabled={archived}>Duplicate</Button>
+              <Button size="sm" variant="destructive" onClick={() => removeNodes(selectedNodes)} disabled={archived}>Delete all</Button>
+            </div>
+          </div>
+        ) : selectedNode && (
+          <div className="w-72 border-l p-4 space-y-3 overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Node settings</h3>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setSelectedNodes([])}>×</Button>
+            </div>
             {(() => {
               const node = nodes.find(n => n.nodeId === selectedNode)
               if (!node) return null
@@ -372,15 +772,19 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
                     <label className="text-xs text-muted-foreground font-medium">Configuration</label>
                     <div className="mt-1">
                       <NodeConfigForm
+                        key={selectedNode}
                         nodeType={node.nodeType}
                         config={parseConfig(node.configJson)}
+                        workflowId={workflowId}
                         onChange={c => updateNodeConfig(selectedNode, c)}
                       />
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    To connect: drag from this node's <b>right port</b> ● to another node's left port.
+                  </p>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => { setConnectFrom(selectedNode) }}>Connect</Button>
-                    <Button size="sm" variant="destructive" onClick={() => removeNode(selectedNode)}>Delete</Button>
+                    <Button size="sm" variant="destructive" onClick={() => removeNode(selectedNode)} disabled={archived}>Delete node</Button>
                   </div>
                 </>
               )
