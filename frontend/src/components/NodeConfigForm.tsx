@@ -273,7 +273,9 @@ export function NodeConfigForm({ nodeType, config, workflowId, onChange }: Props
       const ops = ["equals", "notEquals", "contains", "notContains", "startsWith", "endsWith", "matches", "inList", "greaterThan", "lessThan", "isEmpty", "isNotEmpty"]
       const op = (config.operator as string) || "equals"
       const needsValue = op !== "isEmpty" && op !== "isNotEmpty"
-      const [listText, setListText] = useState(((config.value as string[] | undefined) || []).join(", "))
+      const [listText, setListText] = useState(
+        Array.isArray(config.value) ? (config.value as unknown[]).map(String).join(", ") : ""
+      )
       return (
         <div className="space-y-3">
           <TextRow label="Column (required)" value={(config.column as string) || ""} onChange={v => set("column", v)} />
