@@ -202,9 +202,8 @@ public static class WorkflowValidator
                     {
                         errors.Add($"Node '{nodeId}' requires 'jsonText' with JSON content");
                     }
-                    if (root.TryGetProperty("rootPath", out var rp)
-                        && (rp.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(rp.GetString())))
-                        errors.Add($"Node '{nodeId}' 'rootPath' must be a non-empty string like 'data.orders'");
+                    if (root.TryGetProperty("rootPath", out var rp) && rp.ValueKind != JsonValueKind.String)
+                        errors.Add($"Node '{nodeId}' 'rootPath' must be a string like 'data.orders' (leave it out to parse the whole file)");
                     break;
 
                 case "http.request":
@@ -234,9 +233,8 @@ public static class WorkflowValidator
                                 errors.Add($"Node '{nodeId}' header '{h.Name}' must be a string");
                         }
                     }
-                    if (root.TryGetProperty("rootPath", out var hrp)
-                        && (hrp.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(hrp.GetString())))
-                        errors.Add($"Node '{nodeId}' 'rootPath' must be a non-empty string like 'data.orders'");
+                    if (root.TryGetProperty("rootPath", out var hrp) && hrp.ValueKind != JsonValueKind.String)
+                        errors.Add($"Node '{nodeId}' 'rootPath' must be a string like 'data.orders' (leave it out to parse the whole response)");
                     if (root.TryGetProperty("pagination", out var paging))
                     {
                         if (paging.ValueKind != JsonValueKind.Object)
@@ -445,12 +443,18 @@ public static class WorkflowValidator
                             && !string.Equals(f, "csv", StringComparison.OrdinalIgnoreCase))
                             errors.Add($"Node '{nodeId}' 'format' must be 'json' or 'csv'");
                     }
-                    if (root.TryGetProperty("fileName", out var fileName))
+                    if (root.TryGetProperty("fileName", out var fileName) && fileName.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(fileName.GetString()))
                     {
-                        var fn = fileName.ValueKind == JsonValueKind.String ? fileName.GetString() ?? "" : "";
-                        if (string.IsNullOrWhiteSpace(fn) || fn.Length > 80 || fn.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                        var fn = fileName.GetString()!;
+                        if (fn.Length > 80 || fn.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
                             || fn.Contains('/') || fn.Contains('\\'))
                             errors.Add($"Node '{nodeId}' 'fileName' must be a safe file name (max 80 chars, no path separators)");
+                    }
+                    else if (root.TryGetProperty("fileName", out var fileNameBad) && fileNameBad.ValueKind != JsonValueKind.String
+                        && fileNameBad.ValueKind != JsonValueKind.Null)
+                    {
+                        errors.Add($"Node '{nodeId}' 'fileName' must be a string");
                     }
                     if (root.TryGetProperty("delimiter", out var outDelim)
                         && (outDelim.ValueKind != JsonValueKind.String || outDelim.GetString() is not { Length: 1 }))
