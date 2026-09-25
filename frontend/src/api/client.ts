@@ -146,6 +146,32 @@ export const tasks = {
   retry: (taskId: string) => request<{ message: string }>(`/tasks/${taskId}/retry`, { method: 'POST' }),
 };
 
+export interface NotificationRule {
+  workflowId: string; notifyOnSuccess: boolean; notifyOnFailure: boolean;
+  rejectsAbove: number | null; webhookUrl: string | null; updatedAt: string;
+}
+
+export interface NotificationItem {
+  id: string; workflowId: string; workflowRunId: string; kind: number;
+  title: string; message: string; isRead: boolean; createdAt: string;
+}
+
+export const notifications = {
+  getRule: (workflowId: string) => request<NotificationRule>(`/workflows/${workflowId}/notifications/rule`),
+  saveRule: (workflowId: string, data: { notifyOnSuccess: boolean; notifyOnFailure: boolean; rejectsAbove?: number | null; webhookUrl?: string | null }) =>
+    request<NotificationRule>(`/workflows/${workflowId}/notifications/rule`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRule: (workflowId: string) => request<void>(`/workflows/${workflowId}/notifications/rule`, { method: 'DELETE' }),
+  list: (unreadOnly = false) => request<NotificationItem[]>(`/notifications?unreadOnly=${unreadOnly}`),
+  unreadCount: async () => {
+    const res = await request<{ unread: number }>('/notifications/unread-count');
+    return res.unread;
+  },
+  markRead: (id: string) => request<void>(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllRead: () => request<{ marked: number }>('/notifications/read-all', { method: 'POST' }),
+};
+
+export const NOTIFICATION_KINDS = ['RunSucceeded', 'RunFailed', 'RejectsAboveThreshold'];
+
 export const artifactUrl = (runId: string, nodeId: string) => `/api/v1/runs/${runId}/artifacts/${encodeURIComponent(nodeId)}`;
 
 export const RUN_STATUSES = ['Queued', 'Running', 'Completed', 'Failed', 'Cancelled'];

@@ -3,6 +3,7 @@ import { workflows, type Workflow } from "@/api/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
+import { NotificationsBell } from "@/components/NotificationsBell"
 
 interface DashboardPageProps {
   user: { id: string; email: string; displayName: string }
@@ -38,6 +39,7 @@ export function DashboardPage({ user, onSelectWorkflow, onLogout }: DashboardPag
         <h1 className="text-2xl font-bold">Reflow</h1>
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">{user.email}</span>
+          <NotificationsBell />
           <Button variant="ghost" size="sm" onClick={onLogout}>Logout</Button>
         </div>
       </div>

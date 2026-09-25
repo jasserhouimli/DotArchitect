@@ -1,3 +1,4 @@
+using Reflow.Modules.DataProcessing;
 using Reflow.Modules.WorkflowDesign.Domain;
 using Reflow.Modules.WorkflowDesign.Persistence;
 using Reflow.Modules.WorkflowDesign.Features.GetWorkflow;
@@ -22,10 +23,10 @@ public class UpdateWorkflowHandler(WorkflowDesignDbContext db)
         {
             foreach (var n in request.Nodes)
             {
-                if (!WorkflowValidator.SupportedNodeTypes.Contains(n.NodeType))
+                if (!NodeCatalog.SupportedNodeTypes.Contains(n.NodeType))
                     throw new ArgumentException($"Unsupported node type: {n.NodeType}");
-                if (n.ConfigJson is not null && n.ConfigJson.Length > WorkflowValidator.MaxConfigChars)
-                    throw new ArgumentException($"Node '{n.NodeId}' configuration exceeds {WorkflowValidator.MaxConfigChars} characters");
+                if (n.ConfigJson is not null && n.ConfigJson.Length > NodeCatalog.MaxConfigChars)
+                    throw new ArgumentException($"Node '{n.NodeId}' configuration exceeds {NodeCatalog.MaxConfigChars} characters");
             }
 
             var existingNodes = await db.WorkflowNodes.Where(n => n.WorkflowId == workflowId).ToListAsync(ct);

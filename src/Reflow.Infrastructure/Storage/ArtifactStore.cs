@@ -1,7 +1,7 @@
 using System.Text;
 using Reflow.Infrastructure.Data;
 
-namespace Reflow.Modules.WorkflowExecution.Services;
+namespace Reflow.Infrastructure.Storage;
 
 public interface IArtifactStore
 {

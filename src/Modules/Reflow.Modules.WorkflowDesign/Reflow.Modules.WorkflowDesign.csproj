@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Reflow.Infrastructure\Reflow.Infrastructure.csproj" />
+    <ProjectReference Include="..\Reflow.Modules.DataProcessing\Reflow.Modules.DataProcessing.csproj" />
   </ItemGroup>
 
 </Project>

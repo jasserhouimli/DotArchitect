@@ -2,7 +2,10 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Reflow.Infrastructure;
 using Reflow.Infrastructure.Middleware;
+using Reflow.Infrastructure.Realtime;
+using Reflow.Modules.DataProcessing;
 using Reflow.Modules.Identity;
+using Reflow.Modules.Notifications;
 using Reflow.Modules.WorkflowDesign;
 using Reflow.Modules.WorkflowExecution;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -25,7 +28,9 @@ builder.Services.AddReflowInfrastructure();
 
 IdentityModule.Register(builder);
 WorkflowDesignModule.Register(builder);
+DataProcessingModule.Register(builder);
 WorkflowExecutionModule.Register(builder);
+NotificationsModule.Register(builder);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -130,6 +135,9 @@ app.UseAuthorization();
 IdentityModule.MapEndpoints(app);
 WorkflowDesignModule.MapEndpoints(app);
 WorkflowExecutionModule.MapEndpoints(app);
+NotificationsModule.MapEndpoints(app);
+
+app.MapHub<RunHub>("/hubs/runs");
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 

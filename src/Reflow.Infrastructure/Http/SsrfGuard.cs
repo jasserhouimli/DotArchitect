@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 
-namespace Reflow.Modules.WorkflowExecution.Services;
+namespace Reflow.Infrastructure.Http;
 
 public static class SsrfGuard
 {

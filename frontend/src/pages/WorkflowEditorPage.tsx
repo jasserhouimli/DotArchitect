@@ -7,6 +7,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NodeConfigForm, defaultConfig, parseConfig } from "@/components/NodeConfigForm"
+import { NotificationsBell } from "@/components/NotificationsBell"
+import { AlertsTab } from "@/pages/AlertsTab"
 import { subscribeToRun } from "@/api/realtime"
 
 const NODE_TYPES = [
@@ -59,7 +61,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
   const [validation, setValidation] = useState<{ isValid: boolean; errors: string[]; warnings: string[] } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [tab, setTab] = useState<"editor" | "runs">("editor")
+  const [tab, setTab] = useState<"editor" | "runs" | "alerts">("editor")
   const [versions, setVersions] = useState<WorkflowVersion[]>([])
   const [showVersions, setShowVersions] = useState(false)
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([])
@@ -585,6 +587,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
           <Button size="sm" onClick={publish} disabled={archived}>Publish</Button>
           <Button size="sm" variant="outline" onClick={handleRun} disabled={archived}>Run</Button>
           <Button size="sm" variant="ghost" onClick={archive} disabled={archived}>Archive</Button>
+          <NotificationsBell />
           <Button variant="ghost" size="sm" onClick={onLogout}>Logout</Button>
         </div>
       </div>
@@ -612,6 +615,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
       <div className="flex gap-1 px-4 border-b">
         <button className={`px-3 py-1 text-sm ${tab === "editor" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`} onClick={() => setTab("editor")}>Editor</button>
         <button className={`px-3 py-1 text-sm ${tab === "runs" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`} onClick={() => setTab("runs")}>Runs ({workflowRuns.length})</button>
+        <button className={`px-3 py-1 text-sm ${tab === "alerts" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`} onClick={() => setTab("alerts")}>Alerts</button>
       </div>
 
       {tab === "editor" ? (
@@ -840,6 +844,8 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
           </div>
         )}
       </div>
+      ) : tab === "alerts" ? (
+        <AlertsTab workflowId={workflowId} />
       ) : (
       <div className="flex flex-1 overflow-hidden">
         <div className="w-80 border-r p-3 space-y-2 overflow-y-auto">

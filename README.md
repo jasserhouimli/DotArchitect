@@ -21,15 +21,32 @@ Reflow is a visual workflow orchestration platform for defining, validating, ver
 - Minimal APIs (no controllers)
 - `Result<T>` response type
 - Single PostgreSQL database with schema separation per module
-- No cross-module project references
+- Modules own their data; cross-module communication via explicit contracts and in-process domain events, never direct table access
 
 ## Modules
 
 | Module | Responsibility | Status |
 |--------|---------------|--------|
 | Identity | User registration, login, JWT auth, token refresh | Done |
-| WorkflowDesign | Workflow CRUD, nodes/edges, graph + config validation, publish/versioning, archive | Done |
+| WorkflowDesign | Workflow CRUD, nodes/edges, graph validation, publish/versioning, archive, file uploads | Done |
+| DataProcessing | Task handlers (13 node types), node config schemas, shared data kernel in Infrastructure | Done |
 | WorkflowExecution | Runs, task runs, attempts, logs, retry, cancel, artifacts, worker | Done |
+| Notifications | Per-workflow alert rules, inbox, webhooks (event-driven, owns its data) | Done |
+
+## Realtime updates
+
+Run progress streams over SignalR — no polling. Connect to `/hubs/runs`,
+call `JoinRun(runId)` (ownership-checked; strangers get "not found"), and
+receive `runUpdated`, `taskUpdated`, and `logAppended` events carrying the
+updated entities. The database remains the source of truth; events are
+notifications committed after each state change.
+
+## Notifications
+
+Set per-workflow rules (on success / on failure / reject-count threshold) with
+an optional webhook URL. When a run finishes, the worker publishes a
+`RunFinished` event; the Notifications module writes inbox rows, fires the
+webhook, and pushes live to your clients. No polling, no table sharing.
 
 See `Reflow_Project_Specification.md` for the full specification and roadmap.
 

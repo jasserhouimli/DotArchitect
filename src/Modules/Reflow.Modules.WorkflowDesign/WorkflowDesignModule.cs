@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.EntityFrameworkCore;
+using Reflow.Infrastructure.Snapshots;
+using Reflow.Modules.WorkflowDesign.Features.Snapshots;using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Reflow.Modules.WorkflowDesign.Persistence;
@@ -40,6 +41,7 @@ public static class WorkflowDesignModule
         builder.Services.AddScoped<ArchiveWorkflowHandler>();
         builder.Services.AddScoped<ListVersionsHandler>();
         builder.Services.AddScoped<GetVersionHandler>();
+        builder.Services.AddScoped<IWorkflowSnapshotProvider, WorkflowSnapshotProvider>();
         builder.Services.AddScoped<UploadWorkflowFileHandler>();
         builder.Services.AddScoped<ListWorkflowFilesHandler>();
         builder.Services.AddScoped<DeleteWorkflowFileHandler>();

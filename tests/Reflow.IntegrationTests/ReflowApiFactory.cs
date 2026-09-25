@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Reflow.Modules.Identity.Persistence;
+using Reflow.Modules.Notifications.Persistence;
 using Reflow.Modules.WorkflowDesign.Persistence;
 using Reflow.Modules.WorkflowExecution.Persistence;
 using Xunit;
@@ -65,6 +66,11 @@ public class ReflowApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 EnsureSchema(design, "workflow_design", "Workflows");
             using (var execution = new WorkflowExecutionDbContext(Options<WorkflowExecutionDbContext>()))
                 EnsureSchema(execution, "workflow_execution", "TaskRuns");
+            using (var notifications = new NotificationsDbContext(Options<NotificationsDbContext>()))
+            {
+                EnsureSchema(notifications, "notifications", "NotificationRules");
+                EnsureSchema(notifications, "notifications", "Notifications");
+            }
 
             _initialized = true;
         }

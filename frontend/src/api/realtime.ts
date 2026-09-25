@@ -1,5 +1,5 @@
 import * as signalR from "@microsoft/signalr"
-import type { WorkflowRun, TaskRun } from "@/api/client"
+import type { WorkflowRun, TaskRun, NotificationItem } from "@/api/client"
 
 export interface RunLog {
   id: string
@@ -87,5 +87,27 @@ export async function subscribeToRun(runId: string, events: RunEvents): Promise<
     conn.off("taskUpdated", taskHandler)
     conn.off("logAppended", logHandler)
     conn.invoke("LeaveRun", runId).catch(() => {})
+  }
+}
+
+export async function subscribeToNotifications(
+  onNotification: (n: NotificationItem) => void,
+  onReconnect: () => void,
+): Promise<() => void> {
+  const conn = await ensureStarted()
+
+  const handler = (n: NotificationItem) => onNotification(n)
+  let disposed = false
+  const reconnectHandler = () => {
+    if (!disposed) onReconnect()
+  }
+
+  conn.on("notificationReceived", handler)
+  conn.onreconnected(reconnectHandler)
+
+  return () => {
+    if (disposed) return
+    disposed = true
+    conn.off("notificationReceived", handler)
   }
 }

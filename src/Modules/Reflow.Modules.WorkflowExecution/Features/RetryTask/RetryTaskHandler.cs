@@ -1,12 +1,11 @@
 using Reflow.Infrastructure.Results;
 using Reflow.Modules.WorkflowExecution.Domain;
 using Reflow.Modules.WorkflowExecution.Persistence;
-using Reflow.Modules.WorkflowExecution.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Reflow.Modules.WorkflowExecution.Features.RetryTask;
 
-public class RetryTaskHandler(WorkflowExecutionDbContext db, RunEventPublisher events)
+public class RetryTaskHandler(WorkflowExecutionDbContext db)
 {
     public const int MaxTotalAttempts = 5;
 
@@ -53,8 +52,6 @@ public class RetryTaskHandler(WorkflowExecutionDbContext db, RunEventPublisher e
         });
 
         await db.SaveChangesAsync(ct);
-        await events.RunUpdated(run.Id, userId, ct);
-        await events.TaskUpdated(run.Id, task.Id, userId, ct);
         return Result.Success(200);
     }
 }

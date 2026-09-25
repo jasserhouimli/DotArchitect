@@ -1,9 +1,10 @@
+using Reflow.Infrastructure.Events;
 using Reflow.Modules.WorkflowDesign.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Reflow.Modules.WorkflowDesign.Features.DeleteWorkflow;
 
-public class DeleteWorkflowHandler(WorkflowDesignDbContext db)
+public class DeleteWorkflowHandler(WorkflowDesignDbContext db, IEventBus events)
 {
     public async Task<bool> Handle(Guid workflowId, Guid ownerId, CancellationToken ct)
     {
@@ -19,6 +20,15 @@ public class DeleteWorkflowHandler(WorkflowDesignDbContext db)
         db.WorkflowVersions.RemoveRange(versions);
         db.Workflows.Remove(workflow);
         await db.SaveChangesAsync(ct);
+
+        try
+        {
+            // Best-effort: the delete already committed; subscribers clean up their own data.
+            await events.PublishAsync(new WorkflowDeletedEvent(workflowId, ownerId), ct);
+        }
+        catch
+        {
+        }
         return true;
     }
 }
