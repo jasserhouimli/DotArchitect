@@ -490,6 +490,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
           onRun: r => {
             if (!alive) return
             setSelectedRun(r)
+            setWorkflowRuns(prev => prev.map(x => (x.id === r.id ? r : x)))
             if (!isActive(r)) loadRuns()
           },
           onTask: applyTask,

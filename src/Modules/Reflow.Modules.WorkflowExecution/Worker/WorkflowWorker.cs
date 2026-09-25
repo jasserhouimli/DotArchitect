@@ -271,6 +271,7 @@ public class WorkflowWorker : BackgroundService
             await execDb.SaveChangesAsync(ct);
             await Fire(c => events.LogAppended(run.Id, doneLog.Id, doneLog.TaskRunId, doneLog.Message, doneLog.Level, doneLog.Timestamp, c));
             await Fire(c => events.TaskUpdated(run.Id, task.Id, run.CreatedBy, c));
+            await Fire(c => events.RunUpdated(run.Id, run.CreatedBy, c));
             await TryUnblockDownstream(run.Id, execDb, ct);
         }
         else if (handler is not null && handler.SupportsRetry && result.IsRetryable && attemptNumber < MaxAutoAttempts)
@@ -288,6 +289,7 @@ public class WorkflowWorker : BackgroundService
             await execDb.SaveChangesAsync(ct);
             await Fire(c => events.LogAppended(run.Id, retryLog.Id, retryLog.TaskRunId, retryLog.Message, retryLog.Level, retryLog.Timestamp, c));
             await Fire(c => events.TaskUpdated(run.Id, task.Id, run.CreatedBy, c));
+            await Fire(c => events.RunUpdated(run.Id, run.CreatedBy, c));
         }
         else
         {
