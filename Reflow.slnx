@@ -6,6 +6,7 @@
     <Project Path="src/Modules/Reflow.Modules.WorkflowExecution/Reflow.Modules.WorkflowExecution.csproj" />
     <Project Path="src/Modules/Reflow.Modules.DataProcessing/Reflow.Modules.DataProcessing.csproj" />
     <Project Path="src/Modules/Reflow.Modules.Notifications/Reflow.Modules.Notifications.csproj" />
+    <Project Path="src/Modules/Reflow.Modules.Triggers/Reflow.Modules.Triggers.csproj" />
   </Folder>
   <Project Path="src/Reflow.Api/Reflow.Api.csproj" />
   <Project Path="src/Reflow.Infrastructure/Reflow.Infrastructure.csproj" />

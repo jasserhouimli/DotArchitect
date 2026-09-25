@@ -116,6 +116,7 @@ export interface WorkflowRun {
   id: string; workflowId: string; versionNumber: number; status: number;
   createdAt: string; startedAt: string | null; completedAt: string | null; error: string | null;
   totalTasks: number; completedTasks: number; failedTasks: number;
+  triggerKind: string; triggerName: string | null;
 }
 export interface TaskRun {
   id: string; workflowRunId: string; nodeId: string; nodeType: string; status: number; error: string | null;
@@ -171,6 +172,31 @@ export const notifications = {
 };
 
 export const NOTIFICATION_KINDS = ['RunSucceeded', 'RunFailed', 'RejectsAboveThreshold'];
+
+export interface TriggerItem {
+  id: string; workflowId: string; kind: number; name: string; isEnabled: boolean;
+  cronExpression: string | null; timezone: string | null; overlapPolicy: number;
+  nextRunAt: string | null; lastFiredAt: string | null;
+  createdAt: string; updatedAt: string;
+}
+
+export interface WebhookCreated {
+  id: string; name: string; url: string;
+}
+
+export const triggers = {
+  list: (workflowId: string) => request<TriggerItem[]>(`/workflows/${workflowId}/triggers`),
+  createSchedule: (workflowId: string, data: { name: string; cronExpression: string; timezone: string; overlapPolicy: number; isEnabled: boolean }) =>
+    request<TriggerItem>(`/workflows/${workflowId}/triggers/schedules`, { method: 'POST', body: JSON.stringify(data) }),
+  updateSchedule: (workflowId: string, triggerId: string, data: { name?: string; cronExpression?: string; timezone?: string; overlapPolicy?: number; isEnabled?: boolean }) =>
+    request<TriggerItem>(`/workflows/${workflowId}/triggers/schedules/${triggerId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  createWebhook: (workflowId: string, data: { name: string }) =>
+    request<WebhookCreated>(`/workflows/${workflowId}/triggers/webhooks`, { method: 'POST', body: JSON.stringify(data) }),
+  regenerateWebhook: (workflowId: string, triggerId: string) =>
+    request<WebhookCreated>(`/workflows/${workflowId}/triggers/webhooks/${triggerId}/regenerate`, { method: 'POST' }),
+  delete: (workflowId: string, triggerId: string) =>
+    request<void>(`/workflows/${workflowId}/triggers/${triggerId}`, { method: 'DELETE' }),
+};
 
 export const artifactUrl = (runId: string, nodeId: string) => `/api/v1/runs/${runId}/artifacts/${encodeURIComponent(nodeId)}`;
 

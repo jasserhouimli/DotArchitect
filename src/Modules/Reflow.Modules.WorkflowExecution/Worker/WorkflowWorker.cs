@@ -230,7 +230,7 @@ public class WorkflowWorker : BackgroundService
         else
         {
             var inputs = await LoadPredecessorOutputs(run, task.NodeId, execDb, ct);
-            var context = new TaskExecutionContext(run.Id, task.Id, task.NodeId, task.NodeType, task.ConfigJson, inputs, run.WorkflowId);
+            var context = new TaskExecutionContext(run.Id, task.Id, task.NodeId, task.NodeType, task.ConfigJson, inputs, run.WorkflowId, run.TriggerPayloadJson);
 
             using var taskCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             taskCts.CancelAfter(TaskTimeout);

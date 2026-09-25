@@ -11,7 +11,9 @@ public record RunDto(
     string? Error,
     int TotalTasks,
     int CompletedTasks,
-    int FailedTasks);
+    int FailedTasks,
+    string TriggerKind,
+    string? TriggerName);
 
 public record TaskDto(
     Guid Id,

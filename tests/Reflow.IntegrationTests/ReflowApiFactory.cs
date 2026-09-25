@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Reflow.Modules.Identity.Persistence;
 using Reflow.Modules.Notifications.Persistence;
+using Reflow.Modules.Triggers.Persistence;
 using Reflow.Modules.WorkflowDesign.Persistence;
 using Reflow.Modules.WorkflowExecution.Persistence;
 using Xunit;
@@ -32,6 +33,7 @@ public class ReflowApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimiting:AuthPermitLimit", "1000");
         builder.UseSetting("RateLimiting:GeneralPermitLimit", "10000");
         builder.UseSetting("WorkflowExecution:AllowPrivateNetwork", "false");
+        builder.UseSetting("Triggers:TickSeconds", "2");
     }
 
     public async Task InitializeAsync()
@@ -70,6 +72,21 @@ public class ReflowApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             {
                 EnsureSchema(notifications, "notifications", "NotificationRules");
                 EnsureSchema(notifications, "notifications", "Notifications");
+            }
+            using (var triggers = new TriggersDbContext(Options<TriggersDbContext>()))
+                EnsureSchema(triggers, "triggers", "Triggers");
+
+            // NOTE: CreateTables() only runs for brand-new tables, so columns
+            // added to existing tables by later migrations need explicit alters.
+            await using (var conn = new NpgsqlConnection(TestConnectionString))
+            {
+                await conn.OpenAsync();
+                await using var cmd = new NpgsqlCommand(
+                    "ALTER TABLE workflow_execution.\"WorkflowRuns\" " +
+                    "ADD COLUMN IF NOT EXISTS \"TriggerKind\" character varying(20) NOT NULL DEFAULT '', " +
+                    "ADD COLUMN IF NOT EXISTS \"TriggerName\" character varying(200) NULL, " +
+                    "ADD COLUMN IF NOT EXISTS \"TriggerPayloadJson\" text NULL;", conn);
+                await cmd.ExecuteNonQueryAsync();
             }
 
             _initialized = true;

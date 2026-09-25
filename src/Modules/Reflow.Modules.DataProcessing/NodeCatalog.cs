@@ -12,7 +12,7 @@ public static class NodeCatalog
     {
         "http.request", "data.csv.read", "data.json.read", "data.validate", "data.filter",
         "data.transform", "data.aggregate", "data.sort", "data.limit", "data.dedupe",
-        "data.join", "data.profile", "data.output"
+        "data.join", "data.profile", "trigger.payload", "data.output"
     };
 
     private static readonly HashSet<string> FilterOperators = new(StringComparer.OrdinalIgnoreCase)
@@ -362,6 +362,11 @@ public static class NodeCatalog
                     if (root.TryGetProperty("columns", out var profCols)
                         && (profCols.ValueKind != JsonValueKind.Array || profCols.EnumerateArray().Any(c => c.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(c.GetString()))))
                         errors.Add($"Node '{nodeId}' 'columns' must be an array of non-empty strings (empty means all columns)");
+                    break;
+
+                case "trigger.payload":
+                    if (root.TryGetProperty("rootPath", out var trp) && trp.ValueKind != JsonValueKind.String)
+                        errors.Add($"Node '{nodeId}' 'rootPath' must be a string like 'items' (leave it out to parse the whole payload)");
                     break;
 
                 case "data.output":

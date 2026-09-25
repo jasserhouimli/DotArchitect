@@ -1,4 +1,5 @@
 using Reflow.Infrastructure.Realtime;
+using Reflow.Infrastructure.Runs;
 using Reflow.Modules.WorkflowExecution.Persistence;
 using Reflow.Modules.WorkflowExecution.Features.StartWorkflowRun;
 using Reflow.Modules.WorkflowExecution.Features.GetWorkflowRun;
@@ -28,6 +29,8 @@ public static class WorkflowExecutionModule
         builder.Services.AddScoped<WorkflowExecutionDbContext>();
 
         builder.Services.AddScoped<IRunAccessChecker, RunAccessChecker>();
+        builder.Services.AddScoped<IRunMonitor, RunMonitor>();
+        builder.Services.AddScoped<IWorkflowRunStarter, WorkflowRunStarter>();
 
         builder.Services.AddScoped<StartWorkflowRunHandler>();
         builder.Services.AddScoped<GetWorkflowRunHandler>();

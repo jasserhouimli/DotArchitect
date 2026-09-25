@@ -20,6 +20,7 @@ public class GetWorkflowRunHandler(WorkflowExecutionDbContext db)
             run.CreatedAt, run.StartedAt, run.CompletedAt, run.Error,
             tasks.Count,
             tasks.Count(s => s == Domain.TaskRunStatus.Completed),
-            tasks.Count(s => s == Domain.TaskRunStatus.Failed));
+            tasks.Count(s => s == Domain.TaskRunStatus.Failed),
+            run.TriggerKind, run.TriggerName);
     }
 }

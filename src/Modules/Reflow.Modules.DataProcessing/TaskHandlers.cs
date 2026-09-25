@@ -16,7 +16,8 @@ public record TaskExecutionContext(
     string NodeType,
     string? ConfigJson,
     IReadOnlyList<Dataset> Inputs,
-    Guid WorkflowId);
+    Guid WorkflowId,
+    string? TriggerPayload);
 
 public record TaskExecutionResult(
     bool IsSuccess,
@@ -1517,4 +1518,32 @@ public class HttpRequestHandler : ITaskHandler
     }
 
     private record PaginationOptions(string Param, int Start, int Step, int MaxPages, bool EndWhenEmpty);
+}
+
+public class TriggerPayloadHandler : ITaskHandler
+{
+    public string TaskType => "trigger.payload";
+    public bool SupportsRetry => false;
+
+    public Task<TaskExecutionResult> ExecuteAsync(TaskExecutionContext ctx, CancellationToken ct)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(ctx.TriggerPayload))
+                return Task.FromResult(HandlerHelpers.Fail(
+                    $"Node '{ctx.NodeId}' needs a trigger payload, but this run was started manually"));
+
+            var config = HandlerHelpers.ParseConfig(ctx.ConfigJson, ctx.NodeId);
+            var rootPath = HandlerHelpers.GetString(config, "rootPath");
+            var dataset = JsonDataset.FromJsonText(ctx.TriggerPayload,
+                string.IsNullOrWhiteSpace(rootPath) ? null : rootPath, ctx.NodeId);
+
+            return Task.FromResult(HandlerHelpers.Ok(dataset,
+                $"Trigger payload parsed: {dataset.Rows.Count} records"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Task.FromResult(HandlerHelpers.Fail(ex.Message));
+        }
+    }
 }

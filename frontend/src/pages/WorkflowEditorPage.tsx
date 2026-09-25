@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { NodeConfigForm, defaultConfig, parseConfig } from "@/components/NodeConfigForm"
 import { NotificationsBell } from "@/components/NotificationsBell"
 import { AlertsTab } from "@/pages/AlertsTab"
+import { TriggersTab } from "@/pages/TriggersTab"
 import { subscribeToRun } from "@/api/realtime"
 
 const NODE_TYPES = [
@@ -24,6 +25,7 @@ const NODE_TYPES = [
   { type: "data.join", label: "Join", color: "#d946ef" },
   { type: "data.aggregate", label: "Aggregate", color: "#06b6d4" },
   { type: "data.profile", label: "Profile", color: "#6366f1" },
+  { type: "trigger.payload", label: "Trigger Payload", color: "#0d9488" },
   { type: "data.output", label: "Output", color: "#64748b" },
 ]
 
@@ -61,7 +63,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
   const [validation, setValidation] = useState<{ isValid: boolean; errors: string[]; warnings: string[] } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [tab, setTab] = useState<"editor" | "runs" | "alerts">("editor")
+  const [tab, setTab] = useState<"editor" | "runs" | "alerts" | "triggers">("editor")
   const [versions, setVersions] = useState<WorkflowVersion[]>([])
   const [showVersions, setShowVersions] = useState(false)
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([])
@@ -616,6 +618,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
         <button className={`px-3 py-1 text-sm ${tab === "editor" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`} onClick={() => setTab("editor")}>Editor</button>
         <button className={`px-3 py-1 text-sm ${tab === "runs" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`} onClick={() => setTab("runs")}>Runs ({workflowRuns.length})</button>
         <button className={`px-3 py-1 text-sm ${tab === "alerts" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`} onClick={() => setTab("alerts")}>Alerts</button>
+        <button className={`px-3 py-1 text-sm ${tab === "triggers" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`} onClick={() => setTab("triggers")}>Triggers</button>
       </div>
 
       {tab === "editor" ? (
@@ -846,6 +849,8 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
       </div>
       ) : tab === "alerts" ? (
         <AlertsTab workflowId={workflowId} />
+      ) : tab === "triggers" ? (
+        <TriggersTab workflowId={workflowId} />
       ) : (
       <div className="flex flex-1 overflow-hidden">
         <div className="w-80 border-r p-3 space-y-2 overflow-y-auto">
@@ -856,7 +861,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
                 <span className="font-mono text-xs">{r.id.slice(0, 8)}</span>
                 <span className={`text-xs px-1 rounded ${runBadge(r.status)}`}>{RUN_STATUSES[r.status]}</span>
               </div>
-              <div className="text-xs text-muted-foreground">v{r.versionNumber} · {new Date(r.createdAt).toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">v{r.versionNumber} · {new Date(r.createdAt).toLocaleString()} · via {r.triggerKind}{r.triggerName ? ` (${r.triggerName})` : ""}</div>
               <div className="text-xs text-muted-foreground">{r.completedTasks}/{r.totalTasks} tasks done{r.failedTasks > 0 ? ` · ${r.failedTasks} failed` : ""}</div>
               {r.error && <div className="text-xs text-red-600 truncate">{r.error}</div>}
             </div>

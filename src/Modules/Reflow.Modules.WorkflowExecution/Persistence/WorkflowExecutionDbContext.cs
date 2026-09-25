@@ -21,6 +21,8 @@ public class WorkflowExecutionDbContext : DbContext
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.WorkflowId);
             e.HasIndex(x => x.Status);
+            e.Property(x => x.TriggerKind).HasMaxLength(20);
+            e.Property(x => x.TriggerName).HasMaxLength(200);
         });
         modelBuilder.Entity<TaskRun>(e =>
         {

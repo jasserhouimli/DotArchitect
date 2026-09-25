@@ -29,9 +29,10 @@ Reflow is a visual workflow orchestration platform for defining, validating, ver
 |--------|---------------|--------|
 | Identity | User registration, login, JWT auth, token refresh | Done |
 | WorkflowDesign | Workflow CRUD, nodes/edges, graph validation, publish/versioning, archive, file uploads | Done |
-| DataProcessing | Task handlers (13 node types), node config schemas, shared data kernel in Infrastructure | Done |
+| DataProcessing | Task handlers (14 node types), node config schemas, shared data kernel in Infrastructure | Done |
 | WorkflowExecution | Runs, task runs, attempts, logs, retry, cancel, artifacts, worker | Done |
 | Notifications | Per-workflow alert rules, inbox, webhooks (event-driven, owns its data) | Done |
+| Triggers | Cron schedules + inbound webhooks, payload-driven starts, own schema | Done |
 
 ## Realtime updates
 
@@ -47,6 +48,16 @@ Set per-workflow rules (on success / on failure / reject-count threshold) with
 an optional webhook URL. When a run finishes, the worker publishes a
 `RunFinished` event; the Notifications module writes inbox rows, fires the
 webhook, and pushes live to your clients. No polling, no table sharing.
+
+## Triggers
+
+Workflows start manually, on a cron schedule, or via an inbound webhook.
+Schedules use 5-field cron plus a timezone, support skip/queue overlap
+policies, pause/resume, and catch up missed ticks within the configured
+window. Webhooks expose a per-hook secret URL; POST valid JSON to start a
+run with that body as payload. Inside a workflow, the `trigger.payload` node
+parses the payload (with an optional root path) so downstream nodes can
+consume it. Every run records its trigger kind, name, and payload.
 
 See `Reflow_Project_Specification.md` for the full specification and roadmap.
 
@@ -169,6 +180,7 @@ frontend/
 | `data.aggregate` | `groupBy`, `operations` (count/countDistinct/sum/avg/min/max/median) | Group and summarize |
 | `data.profile` | `columns` (empty = all) | One stats row per column (count, nulls, distinct, min/max/mean) |
 | `data.output` | `format` (json/csv), `fileName`, `delimiter`, `includeHeader` | Save downloadable artifact |
+| `trigger.payload` | `rootPath` (e.g. `order.id`) | Parse the schedule/webhook payload that started the run |
 
 ## File uploads
 

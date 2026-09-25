@@ -9,7 +9,7 @@ namespace Reflow.UnitTests;
 public class HandlerTests
 {
     private static TaskExecutionContext Ctx(string nodeId, string nodeType, string config, params Dataset[] inputs)
-        => new(Guid.NewGuid(), Guid.NewGuid(), nodeId, nodeType, config, inputs, Guid.NewGuid());
+        => new(Guid.NewGuid(), Guid.NewGuid(), nodeId, nodeType, config, inputs, Guid.NewGuid(), null);
 
     private static FakeUploadStore Uploads() => new();
 

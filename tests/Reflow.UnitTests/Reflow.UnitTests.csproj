@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\Modules\Reflow.Modules.WorkflowExecution\Reflow.Modules.WorkflowExecution.csproj" />
     <ProjectReference Include="..\..\src\Modules\Reflow.Modules.DataProcessing\Reflow.Modules.DataProcessing.csproj" />
     <ProjectReference Include="..\..\src\Modules\Reflow.Modules.Notifications\Reflow.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Reflow.Modules.Triggers\Reflow.Modules.Triggers.csproj" />
   </ItemGroup>
 
 </Project>

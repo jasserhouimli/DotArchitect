@@ -6,6 +6,7 @@ using Reflow.Infrastructure.Realtime;
 using Reflow.Modules.DataProcessing;
 using Reflow.Modules.Identity;
 using Reflow.Modules.Notifications;
+using Reflow.Modules.Triggers;
 using Reflow.Modules.WorkflowDesign;
 using Reflow.Modules.WorkflowExecution;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -31,6 +32,7 @@ WorkflowDesignModule.Register(builder);
 DataProcessingModule.Register(builder);
 WorkflowExecutionModule.Register(builder);
 NotificationsModule.Register(builder);
+TriggersModule.Register(builder);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -81,6 +83,7 @@ builder.Services.AddRateLimiter(options =>
 
     var authLimit = builder.Configuration.GetValue<int?>("RateLimiting:AuthPermitLimit") ?? 5;
     var generalLimit = builder.Configuration.GetValue<int?>("RateLimiting:GeneralPermitLimit") ?? 100;
+    var webhookLimit = builder.Configuration.GetValue<int?>("RateLimiting:WebhookPermitLimit") ?? 30;
 
     options.AddFixedWindowLimiter("auth", limiterOptions =>
     {
@@ -94,6 +97,13 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions.PermitLimit = generalLimit;
         limiterOptions.Window = TimeSpan.FromMinutes(1);
         limiterOptions.QueueLimit = 10;
+    });
+
+    options.AddFixedWindowLimiter("webhook", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = webhookLimit;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueLimit = 0;
     });
 });
 
@@ -136,6 +146,7 @@ IdentityModule.MapEndpoints(app);
 WorkflowDesignModule.MapEndpoints(app);
 WorkflowExecutionModule.MapEndpoints(app);
 NotificationsModule.MapEndpoints(app);
+TriggersModule.MapEndpoints(app);
 
 app.MapHub<RunHub>("/hubs/runs");
 

@@ -27,6 +27,7 @@ public static class DataProcessingModule
         builder.Services.AddSingleton<ITaskHandler, DedupeHandler>();
         builder.Services.AddSingleton<ITaskHandler, JoinHandler>();
         builder.Services.AddSingleton<ITaskHandler, ProfileHandler>();
+        builder.Services.AddSingleton<ITaskHandler, TriggerPayloadHandler>();
         builder.Services.AddSingleton<ITaskHandler, OutputHandler>();
         builder.Services.AddSingleton<ITaskHandler, HttpRequestHandler>();
         builder.Services.AddSingleton<TaskHandlerRegistry>(sp =>

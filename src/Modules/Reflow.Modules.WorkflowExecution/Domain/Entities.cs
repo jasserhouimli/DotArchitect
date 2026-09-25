@@ -16,6 +16,9 @@ public class WorkflowRun
     public DateTime? CompletedAt { get; set; }
     public string? Error { get; set; }
     public string? EdgesJson { get; set; }
+    public string TriggerKind { get; set; } = "manual";
+    public string? TriggerName { get; set; }
+    public string? TriggerPayloadJson { get; set; }
 }
 
 public class TaskRun

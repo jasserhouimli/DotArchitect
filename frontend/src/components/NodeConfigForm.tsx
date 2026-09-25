@@ -525,6 +525,16 @@ export function NodeConfigForm({ nodeType, config, workflowId, onChange }: Props
       )
     }
 
+    case "trigger.payload":
+      return (
+        <div className="space-y-3">
+          <TextRow label="Root path (optional, e.g. order.id)" value={(config.rootPath as string) || ""}
+            placeholder="items.0"
+            onChange={v => set("rootPath", v)} />
+          <p className="text-xs text-muted-foreground">Parses the JSON payload delivered by the schedule/webhook trigger that started this run. Fails on manual runs without a payload.</p>
+        </div>
+      )
+
     case "data.output":
       return (
         <div className="space-y-3">
@@ -574,6 +584,7 @@ export function defaultConfig(nodeType: string): ConfigObject {
     case "data.dedupe": return { columns: [] }
     case "data.join": return { how: "inner", on: [] }
     case "data.profile": return { columns: [] }
+    case "trigger.payload": return { rootPath: "" }
     case "data.output": return { format: "json" }
     default: return {}
   }
