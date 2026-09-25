@@ -3,6 +3,7 @@ using Reflow.Infrastructure.Data;
 using Reflow.Modules.WorkflowExecution.Domain;
 using Reflow.Modules.WorkflowExecution.Handlers;
 using Reflow.Modules.WorkflowExecution.Persistence;
+using Reflow.Modules.WorkflowExecution.Services;
 using Reflow.Modules.WorkflowDesign.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -155,6 +156,20 @@ public class WorkflowWorker : BackgroundService
         using var scope = _services.CreateScope();
         var execDb = scope.ServiceProvider.GetRequiredService<WorkflowExecutionDbContext>();
         var registry = scope.ServiceProvider.GetRequiredService<TaskHandlerRegistry>();
+        var events = scope.ServiceProvider.GetRequiredService<RunEventPublisher>();
+
+        async Task Fire(Func<CancellationToken, Task> send)
+        {
+            try
+            {
+                await send(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                // Event publishing must never break execution.
+                _logger.LogWarning(ex, "Failed to publish run event");
+            }
+        }
 
         var task = await execDb.TaskRuns.FindAsync([taskId], ct);
         if (task is null) return;
@@ -165,6 +180,7 @@ public class WorkflowWorker : BackgroundService
             task.Status = TaskRunStatus.Failed;
             task.Error = "Parent run not found";
             await execDb.SaveChangesAsync(ct);
+            await Fire(c => events.TaskUpdated(task.WorkflowRunId, task.Id, Guid.Empty, c));
             return;
         }
 
@@ -173,6 +189,7 @@ public class WorkflowWorker : BackgroundService
             task.Status = TaskRunStatus.Cancelled;
             task.CompletedAt = DateTime.UtcNow;
             await execDb.SaveChangesAsync(ct);
+            await Fire(c => events.TaskUpdated(run.Id, task.Id, run.CreatedBy, c));
             return;
         }
 
@@ -180,12 +197,15 @@ public class WorkflowWorker : BackgroundService
         {
             task.Status = TaskRunStatus.Skipped;
             task.CompletedAt = DateTime.UtcNow;
-            execDb.ExecutionLogs.Add(new ExecutionLog
+            var skipLog = new ExecutionLog
             {
                 Id = Guid.NewGuid(), WorkflowRunId = run.Id, TaskRunId = task.Id,
                 Message = $"Task {task.NodeId} skipped because run is {run.Status}", Level = "Warning"
-            });
+            };
+            execDb.ExecutionLogs.Add(skipLog);
             await execDb.SaveChangesAsync(ct);
+            await Fire(c => events.LogAppended(run.Id, skipLog.Id, skipLog.TaskRunId, skipLog.Message, skipLog.Level, skipLog.Timestamp, c));
+            await Fire(c => events.TaskUpdated(run.Id, task.Id, run.CreatedBy, c));
             return;
         }
 
@@ -242,12 +262,15 @@ public class WorkflowWorker : BackgroundService
             task.Error = null;
             task.OutputJson = result.OutputJson;
             task.NotBefore = null;
-            execDb.ExecutionLogs.Add(new ExecutionLog
+            var doneLog = new ExecutionLog
             {
                 Id = Guid.NewGuid(), WorkflowRunId = run.Id, TaskRunId = task.Id,
                 Message = $"Task {task.NodeId} completed: {result.Log}", Level = "Info"
-            });
+            };
+            execDb.ExecutionLogs.Add(doneLog);
             await execDb.SaveChangesAsync(ct);
+            await Fire(c => events.LogAppended(run.Id, doneLog.Id, doneLog.TaskRunId, doneLog.Message, doneLog.Level, doneLog.Timestamp, c));
+            await Fire(c => events.TaskUpdated(run.Id, task.Id, run.CreatedBy, c));
             await TryUnblockDownstream(run.Id, execDb, ct);
         }
         else if (handler is not null && handler.SupportsRetry && result.IsRetryable && attemptNumber < MaxAutoAttempts)
@@ -256,12 +279,15 @@ public class WorkflowWorker : BackgroundService
             task.Status = TaskRunStatus.RetryScheduled;
             task.Error = result.Error;
             task.NotBefore = DateTime.UtcNow.AddSeconds(5 * attemptNumber);
-            execDb.ExecutionLogs.Add(new ExecutionLog
+            var retryLog = new ExecutionLog
             {
                 Id = Guid.NewGuid(), WorkflowRunId = run.Id, TaskRunId = task.Id,
                 Message = $"Task {task.NodeId} failed (attempt {attemptNumber}): {result.Error}. Retry scheduled.", Level = "Warning"
-            });
+            };
+            execDb.ExecutionLogs.Add(retryLog);
             await execDb.SaveChangesAsync(ct);
+            await Fire(c => events.LogAppended(run.Id, retryLog.Id, retryLog.TaskRunId, retryLog.Message, retryLog.Level, retryLog.Timestamp, c));
+            await Fire(c => events.TaskUpdated(run.Id, task.Id, run.CreatedBy, c));
         }
         else
         {
@@ -273,16 +299,30 @@ public class WorkflowWorker : BackgroundService
             run.Status = WorkflowRunStatus.Failed;
             run.CompletedAt = DateTime.UtcNow;
             run.Error = $"Task {task.NodeId} failed: {result.Error}";
-            execDb.ExecutionLogs.Add(new ExecutionLog
+            var failLog = new ExecutionLog
             {
                 Id = Guid.NewGuid(), WorkflowRunId = run.Id, TaskRunId = task.Id,
                 Message = $"Task {task.NodeId} failed: {result.Error}", Level = "Error"
-            });
+            };
+            execDb.ExecutionLogs.Add(failLog);
             await execDb.SaveChangesAsync(ct);
-            await SkipDownstream(run.Id, execDb, ct);
+            await Fire(c => events.LogAppended(run.Id, failLog.Id, failLog.TaskRunId, failLog.Message, failLog.Level, failLog.Timestamp, c));
+            await Fire(c => events.TaskUpdated(run.Id, task.Id, run.CreatedBy, c));
+            var skipped = await SkipDownstream(run.Id, execDb, ct);
+            foreach (var (skippedTaskId, skipLog) in skipped)
+            {
+                await Fire(c => events.LogAppended(run.Id, skipLog.Id, skipLog.TaskRunId, skipLog.Message, skipLog.Level, skipLog.Timestamp, c));
+                await Fire(c => events.TaskUpdated(run.Id, skippedTaskId, run.CreatedBy, c));
+            }
+            await Fire(c => events.RunUpdated(run.Id, run.CreatedBy, c));
         }
 
-        await TryFinalizeRun(run.Id, execDb, ct);
+        var completionLog = await TryFinalizeRun(run.Id, execDb, ct);
+        if (completionLog is not null)
+        {
+            await Fire(c => events.LogAppended(run.Id, completionLog.Id, completionLog.TaskRunId, completionLog.Message, completionLog.Level, completionLog.Timestamp, c));
+            await Fire(c => events.RunUpdated(run.Id, run.CreatedBy, c));
+        }
     }
 
     private static async Task<List<Dataset>> LoadPredecessorOutputs(WorkflowRun run, string nodeId, WorkflowExecutionDbContext execDb, CancellationToken ct)
@@ -338,43 +378,49 @@ public class WorkflowWorker : BackgroundService
         await execDb.SaveChangesAsync(ct);
     }
 
-    private static async Task SkipDownstream(Guid runId, WorkflowExecutionDbContext execDb, CancellationToken ct)
+    private static async Task<List<(Guid TaskId, ExecutionLog Log)>> SkipDownstream(Guid runId, WorkflowExecutionDbContext execDb, CancellationToken ct)
     {
         var tasks = await execDb.TaskRuns
             .Where(t => t.WorkflowRunId == runId
                 && (t.Status == TaskRunStatus.Pending || t.Status == TaskRunStatus.Ready || t.Status == TaskRunStatus.RetryScheduled))
             .ToListAsync(ct);
 
+        var skipped = new List<(Guid, ExecutionLog)>();
         foreach (var task in tasks)
         {
             task.Status = TaskRunStatus.Skipped;
             task.CompletedAt = DateTime.UtcNow;
-            execDb.ExecutionLogs.Add(new ExecutionLog
+            var log = new ExecutionLog
             {
                 Id = Guid.NewGuid(), WorkflowRunId = runId, TaskRunId = task.Id,
                 Message = $"Task {task.NodeId} skipped because an upstream task failed", Level = "Warning"
-            });
+            };
+            execDb.ExecutionLogs.Add(log);
+            skipped.Add((task.Id, log));
         }
 
         await execDb.SaveChangesAsync(ct);
+        return skipped;
     }
 
-    private static async Task TryFinalizeRun(Guid runId, WorkflowExecutionDbContext execDb, CancellationToken ct)
+    private static async Task<ExecutionLog?> TryFinalizeRun(Guid runId, WorkflowExecutionDbContext execDb, CancellationToken ct)
     {
         var run = await execDb.WorkflowRuns.FindAsync([runId], ct);
-        if (run is null || run.Status != WorkflowRunStatus.Running) return;
+        if (run is null || run.Status != WorkflowRunStatus.Running) return null;
 
         var tasks = await execDb.TaskRuns.Where(t => t.WorkflowRunId == runId).ToListAsync(ct);
-        if (tasks.Count == 0 || !tasks.All(t => IsTerminal(t.Status))) return;
+        if (tasks.Count == 0 || !tasks.All(t => IsTerminal(t.Status))) return null;
 
         run.Status = WorkflowRunStatus.Completed;
         run.CompletedAt = DateTime.UtcNow;
-        execDb.ExecutionLogs.Add(new ExecutionLog
+        var log = new ExecutionLog
         {
             Id = Guid.NewGuid(), WorkflowRunId = run.Id,
             Message = $"Run {run.Id} completed ({tasks.Count(t => t.Status == TaskRunStatus.Completed)}/{tasks.Count} tasks succeeded)", Level = "Info"
-        });
+        };
+        execDb.ExecutionLogs.Add(log);
         await execDb.SaveChangesAsync(ct);
+        return log;
     }
 
     private static bool IsTerminal(TaskRunStatus status) => status is

@@ -1,11 +1,12 @@
 using Reflow.Infrastructure.Results;
 using Reflow.Modules.WorkflowExecution.Domain;
 using Reflow.Modules.WorkflowExecution.Persistence;
+using Reflow.Modules.WorkflowExecution.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Reflow.Modules.WorkflowExecution.Features.CancelRun;
 
-public class CancelRunHandler(WorkflowExecutionDbContext db)
+public class CancelRunHandler(WorkflowExecutionDbContext db, RunEventPublisher events)
 {
     public async Task<Result> Handle(Guid runId, Guid userId, CancellationToken ct)
     {
@@ -36,6 +37,9 @@ public class CancelRunHandler(WorkflowExecutionDbContext db)
         });
 
         await db.SaveChangesAsync(ct);
+        await events.RunUpdated(run.Id, userId, ct);
+        foreach (var task in pending)
+            await events.TaskUpdated(run.Id, task.Id, userId, ct);
         return Result.Success(200);
     }
 }

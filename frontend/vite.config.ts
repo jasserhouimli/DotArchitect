@@ -14,6 +14,10 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:5001',
       '/auth': 'http://localhost:5001',
+      '/hubs': {
+        target: 'http://localhost:5001',
+        ws: true,
+      },
     },
   },
 })

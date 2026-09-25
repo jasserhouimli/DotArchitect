@@ -110,6 +110,14 @@ See `Reflow_Project_Specification.md` for the full specification and roadmap.
 | GET | /api/v1/tasks/{id}/attempts | Task attempts |
 | POST | /api/v1/tasks/{id}/retry | Retry failed task |
 
+## Realtime updates
+
+Run progress streams over SignalR — no polling. Connect to `/hubs/runs`,
+call `JoinRun(runId)` (ownership-checked; strangers get "not found"), and
+receive `runUpdated`, `taskUpdated`, and `logAppended` events carrying the
+updated entities. The database remains the source of truth; events are
+notifications committed after each state change.
+
 ## Project Structure
 
 ```

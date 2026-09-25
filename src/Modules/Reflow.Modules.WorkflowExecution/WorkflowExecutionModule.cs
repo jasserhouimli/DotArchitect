@@ -1,4 +1,5 @@
 using Reflow.Modules.WorkflowExecution.Handlers;
+using Reflow.Modules.WorkflowExecution.Hubs;
 using Reflow.Modules.WorkflowExecution.Persistence;
 using Reflow.Modules.WorkflowExecution.Services;
 using Reflow.Modules.WorkflowExecution.Features.StartWorkflowRun;
@@ -38,6 +39,11 @@ public static class WorkflowExecutionModule
 
         builder.Services.AddSingleton<IArtifactStore, LocalArtifactStore>();
 
+        builder.Services.AddSignalR().AddJsonProtocol(options =>
+        {
+            options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        });
+
         builder.Services.AddSingleton<ITaskHandler, CsvReadHandler>();
         builder.Services.AddSingleton<ITaskHandler, JsonReadHandler>();
         builder.Services.AddSingleton<ITaskHandler, ValidateHandler>();
@@ -62,6 +68,7 @@ public static class WorkflowExecutionModule
         builder.Services.AddScoped<RetryTaskHandler>();
         builder.Services.AddScoped<GetTaskRunHandler>();
         builder.Services.AddScoped<GetArtifactHandler>();
+        builder.Services.AddScoped<RunEventPublisher>();
 
         builder.Services.AddHostedService<WorkflowWorker>();
     }
@@ -76,5 +83,6 @@ public static class WorkflowExecutionModule
         RetryTaskEndpoint.Map(app);
         GetTaskRunEndpoint.Map(app);
         GetArtifactEndpoint.Map(app);
+        app.MapHub<RunHub>("/hubs/runs");
     }
 }

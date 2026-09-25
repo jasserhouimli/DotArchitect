@@ -4,11 +4,12 @@ using Reflow.Modules.WorkflowDesign.Persistence;
 using Reflow.Modules.WorkflowDesign.Validation;
 using Reflow.Modules.WorkflowExecution.Domain;
 using Reflow.Modules.WorkflowExecution.Persistence;
+using Reflow.Modules.WorkflowExecution.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Reflow.Modules.WorkflowExecution.Features.StartWorkflowRun;
 
-public class StartWorkflowRunHandler(WorkflowDesignDbContext designDb, WorkflowExecutionDbContext execDb)
+public class StartWorkflowRunHandler(WorkflowDesignDbContext designDb, WorkflowExecutionDbContext execDb, RunEventPublisher events)
 {
     public async Task<Result<Guid>> Handle(Guid workflowId, Guid userId, CancellationToken ct)
     {
@@ -74,6 +75,7 @@ public class StartWorkflowRunHandler(WorkflowDesignDbContext designDb, WorkflowE
         run.StartedAt = DateTime.UtcNow;
         await execDb.SaveChangesAsync(ct);
 
+        await events.RunUpdated(run.Id, userId, ct);
         return Result<Guid>.Success(run.Id, 201);
     }
 

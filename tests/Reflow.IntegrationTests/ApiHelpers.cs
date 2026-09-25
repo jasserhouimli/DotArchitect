@@ -6,7 +6,7 @@ namespace Reflow.IntegrationTests;
 
 public static class ApiHelpers
 {
-    public static async Task<HttpClient> LoginNewUserAsync(ReflowApiFactory factory)
+    public static async Task<(HttpClient Client, string Token)> LoginNewUserWithTokenAsync(ReflowApiFactory factory)
     {
         var client = factory.CreateClient();
         var email = $"u{Guid.NewGuid():N}@test.com";
@@ -27,11 +27,17 @@ public static class ApiHelpers
         login.EnsureSuccessStatusCode();
 
         var body = await login.Content.ReadFromJsonAsync<JsonDocument>();
-        var token = body!.RootElement.GetProperty("accessToken").GetString();
+        var token = body!.RootElement.GetProperty("accessToken").GetString()!;
 
         var authed = factory.CreateClient();
         authed.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return authed;
+        return (authed, token);
+    }
+
+    public static async Task<HttpClient> LoginNewUserAsync(ReflowApiFactory factory)
+    {
+        var (client, _) = await LoginNewUserWithTokenAsync(factory);
+        return client;
     }
 
     public static async Task<Guid> CreateWorkflowAsync(HttpClient client, string name = "Test workflow")

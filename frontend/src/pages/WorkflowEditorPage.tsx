@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NodeConfigForm, defaultConfig, parseConfig } from "@/components/NodeConfigForm"
+import { subscribeToRun } from "@/api/realtime"
 
 const NODE_TYPES = [
   { type: "data.csv.read", label: "CSV Read", color: "#10b981" },
@@ -68,6 +69,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
   const [expandedTask, setExpandedTask] = useState<string | null>(null)
   const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null)
   const [attempts, setAttempts] = useState<Attempt[]>([])
+  const [live, setLive] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const dragRef = useRef<{ ids: { id: string; origX: number; origY: number }[]; startX: number; startY: number; moved: boolean } | null>(null)
@@ -454,22 +456,67 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
   useEffect(() => {
     if (!selectedRun) return
     let alive = true
-    const poll = () => {
-      runs.get(selectedRun.id).then(r => { if (alive) setSelectedRun(r) }).catch(() => {})
-      runs.tasks(selectedRun.id).then(t => { if (alive) setTaskRuns(t) }).catch(() => {})
-      runs.logs(selectedRun.id).then(l => { if (alive) setLogs(l) }).catch(() => {})
+    let unsubscribe: (() => void) | null = null
+
+    const applyTask = (t: TaskRun) => {
+      if (!alive) return
+      setTaskRuns(prev => {
+        const i = prev.findIndex(x => x.id === t.id)
+        if (i < 0) return [...prev, t]
+        if (prev[i] === t) return prev
+        const next = [...prev]
+        next[i] = t
+        return next
+      })
     }
-    poll()
-    const id = setInterval(() => {
-      runs.get(selectedRun.id).then(r => {
+    const applyLog = (l: { id: string; taskRunId: string | null; message: string; level: string; timestamp: string }) => {
+      if (!alive) return
+      setLogs(prev => (prev.some(x => x.id === l.id) ? prev : [...prev, l]))
+    }
+
+    // Snapshot first, then join for live updates, then refetch to close the gap.
+    const boot = async () => {
+      const id = selectedRun.id
+      try {
+        const [r, t, l] = await Promise.all([runs.get(id), runs.tasks(id), runs.logs(id)])
         if (!alive) return
         setSelectedRun(r)
-        if (!isActive(r)) { clearInterval(id); loadRuns() }
-      }).catch(() => {})
-      runs.tasks(selectedRun.id).then(t => { if (alive) setTaskRuns(t) }).catch(() => {})
-      runs.logs(selectedRun.id).then(l => { if (alive) setLogs(l) }).catch(() => {})
-    }, 2000)
-    return () => { alive = false; clearInterval(id) }
+        setTaskRuns(t)
+        setLogs(l)
+      } catch { /* run may be gone; live events will correct */ }
+      if (!alive) return
+      try {
+        unsubscribe = await subscribeToRun(id, {
+          onRun: r => {
+            if (!alive) return
+            setSelectedRun(r)
+            if (!isActive(r)) loadRuns()
+          },
+          onTask: applyTask,
+          onLog: applyLog,
+          onReconnect: () => {
+            if (!alive) return
+            runs.get(id).then(setSelectedRun).catch(() => {})
+            runs.tasks(id).then(setTaskRuns).catch(() => {})
+            runs.logs(id).then(setLogs).catch(() => {})
+          },
+        })
+        if (alive) setLive(true)
+      } catch {
+        // Hub unreachable: fall back to one snapshot; user can switch runs to retry.
+        if (alive) {
+          setLive(false)
+          loadRuns()
+        }
+      }
+    }
+    boot()
+
+    return () => {
+      alive = false
+      setLive(false)
+      unsubscribe?.()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRun?.id])
 
@@ -815,6 +862,9 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
               <div className="flex items-center gap-2">
                 <h3 className="font-medium">Run {selectedRun.id.slice(0, 8)}</h3>
                 <span className="text-xs text-muted-foreground">v{selectedRun.versionNumber} · {RUN_STATUSES[selectedRun.status]} · {selectedRun.completedTasks}/{selectedRun.totalTasks} done</span>
+                <span className={`flex items-center gap-1 text-xs ${live ? "text-green-600" : "text-muted-foreground"}`} title={live ? "Live updates connected" : "Connecting live updates…"}>
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${live ? "bg-green-500" : "bg-gray-300"}`} />{live ? "Live" : "…"}
+                </span>
                 <div className="flex-1" />
                 {isActive(selectedRun) && <Button size="sm" variant="destructive" onClick={handleCancel}>Cancel run</Button>}
               </div>
