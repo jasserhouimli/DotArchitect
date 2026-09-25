@@ -60,24 +60,6 @@ public class RunFinishedSubscriber(
         }
         if (events.Count == 0) return;
 
-        var payload = new
-        {
-            workflowId = @event.WorkflowId,
-            workflowName = @event.WorkflowName,
-            runId = @event.RunId,
-            version = @event.VersionNumber,
-            succeeded = @event.Succeeded,
-            summary = new
-            {
-                total = @event.TotalTasks,
-                completed = @event.CompletedTasks,
-                failed = @event.FailedTasks,
-                rejected = @event.TotalRejected
-            },
-            error = @event.Error,
-            timestamp = DateTime.UtcNow
-        };
-
         foreach (var (kind, title, message, eventName) in events)
         {
             db.Notifications.Add(new Notification
@@ -92,18 +74,13 @@ public class RunFinishedSubscriber(
             });
 
             if (!string.IsNullOrWhiteSpace(rule.WebhookUrl))
-                await webhooks.SendAsync(rule.WebhookUrl, new
-                {
-                    @event = eventName,
-                    payload.workflowId,
-                    payload.workflowName,
-                    payload.runId,
-                    payload.version,
-                    payload.succeeded,
-                    payload.summary,
-                    payload.error,
-                    payload.timestamp
-                }, ct);
+            {
+                var payload = WebhookPayload.Build(rule.WebhookUrl, eventName, title, message,
+                    @event.WorkflowId, @event.WorkflowName, @event.RunId, @event.VersionNumber,
+                    @event.Succeeded, @event.TotalTasks, @event.CompletedTasks, @event.FailedTasks,
+                    @event.TotalRejected, @event.Error);
+                await webhooks.SendAsync(rule.WebhookUrl, payload, ct);
+            }
         }
 
         await db.SaveChangesAsync(ct);
