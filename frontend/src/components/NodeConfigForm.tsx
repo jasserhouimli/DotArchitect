@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { ExpressionInput } from "@/components/ExpressionInput"
 import { workflows, type WorkflowFile } from "@/api/client"
 
 export type ConfigObject = Record<string, unknown>
@@ -16,7 +17,7 @@ function TextRow({ label, value, onChange, placeholder }: { label: string; value
   return (
     <div>
       <label className="text-xs text-muted-foreground">{label}</label>
-      <Input value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} />
+      <ExpressionInput value={value} placeholder={placeholder} onChange={onChange} />
     </div>
   )
 }
@@ -535,6 +536,68 @@ export function NodeConfigForm({ nodeType, config, workflowId, onChange }: Props
         </div>
       )
 
+    case "workflow.call": {
+      const [options, setOptions] = useState<{ id: string; name: string; status: string }[]>([])
+      const [payloadText, setPayloadText] = useState(
+        config.payload === undefined ? "" : JSON.stringify(config.payload, null, 1))
+      const [payloadError, setPayloadError] = useState("")
+      useEffect(() => {
+        workflows.list()
+          .then(ws => setOptions(ws.filter(w => w.id !== workflowId && w.status === "Published")))
+          .catch(() => {})
+      }, [])
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-muted-foreground">Target workflow (must be published)</label>
+            <select className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+              value={(config.targetWorkflowId as string) || ""}
+              onChange={e => set("targetWorkflowId", e.target.value)}>
+              <option value="">Select a workflow…</option>
+              {options.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Mode</label>
+            <select className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+              value={(config.mode as string) || "wait"}
+              onChange={e => set("mode", e.target.value)}>
+              <option value="wait">Wait for the child run to finish</option>
+              <option value="fireAndForget">Start and continue immediately</option>
+            </select>
+          </div>
+          <TextRow label="Timeout (seconds, wait mode, 5–110)" value={String((config.timeoutSeconds as number) ?? 100)}
+            onChange={v => {
+              const n = parseInt(v, 10)
+              set("timeoutSeconds", Number.isNaN(n) ? v : n)
+            }} />
+          <div>
+            <label className="text-xs text-muted-foreground">Payload (JSON object, supports {"{{ }}"} expressions)</label>
+            <textarea className="w-full min-h-20 rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono"
+              placeholder={'{\n  "orderId": "{{ trigger.body.order.id }}"\n}'}
+              value={payloadText}
+              onChange={e => {
+                setPayloadText(e.target.value)
+                if (e.target.value.trim() === "") { setPayloadError(""); set("payload", undefined); return }
+                try {
+                  const parsed = JSON.parse(e.target.value)
+                  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+                    setPayloadError("Payload must be a JSON object.")
+                  } else {
+                    setPayloadError("")
+                    set("payload", parsed)
+                  }
+                } catch {
+                  setPayloadError("Invalid JSON.")
+                }
+              }} />
+            {payloadError && <p className="text-xs text-red-600">{payloadError}</p>}
+          </div>
+          <p className="text-xs text-muted-foreground">The child run starts with trigger kind “workflow”. Publishing is blocked when the call would create a cycle.</p>
+        </div>
+      )
+    }
+
     case "data.output":
       return (
         <div className="space-y-3">
@@ -585,6 +648,7 @@ export function defaultConfig(nodeType: string): ConfigObject {
     case "data.join": return { how: "inner", on: [] }
     case "data.profile": return { columns: [] }
     case "trigger.payload": return { rootPath: "" }
+    case "workflow.call": return { targetWorkflowId: "", mode: "wait", timeoutSeconds: 100 }
     case "data.output": return { format: "json" }
     default: return {}
   }

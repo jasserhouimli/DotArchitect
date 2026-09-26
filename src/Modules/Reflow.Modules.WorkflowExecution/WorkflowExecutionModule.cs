@@ -1,5 +1,6 @@
 using Reflow.Infrastructure.Realtime;
 using Reflow.Infrastructure.Runs;
+using Reflow.Modules.DataProcessing;
 using Reflow.Modules.WorkflowExecution.Persistence;
 using Reflow.Modules.WorkflowExecution.Features.StartWorkflowRun;
 using Reflow.Modules.WorkflowExecution.Features.GetWorkflowRun;
@@ -9,6 +10,7 @@ using Reflow.Modules.WorkflowExecution.Features.CancelRun;
 using Reflow.Modules.WorkflowExecution.Features.RetryTask;
 using Reflow.Modules.WorkflowExecution.Features.GetTaskRun;
 using Reflow.Modules.WorkflowExecution.Features.Artifacts;
+using Reflow.Modules.WorkflowExecution.Handlers;
 using Reflow.Modules.WorkflowExecution.Services;
 using Reflow.Modules.WorkflowExecution.Worker;
 using Microsoft.AspNetCore.Builder;
@@ -31,6 +33,7 @@ public static class WorkflowExecutionModule
         builder.Services.AddScoped<IRunAccessChecker, RunAccessChecker>();
         builder.Services.AddScoped<IRunMonitor, RunMonitor>();
         builder.Services.AddScoped<IWorkflowRunStarter, WorkflowRunStarter>();
+        builder.Services.AddSingleton<WorkerWakeup>();
 
         builder.Services.AddScoped<StartWorkflowRunHandler>();
         builder.Services.AddScoped<GetWorkflowRunHandler>();
@@ -42,6 +45,10 @@ public static class WorkflowExecutionModule
         builder.Services.AddScoped<GetArtifactHandler>();
 
         builder.Services.AddHostedService<WorkflowWorker>();
+        builder.Services.AddHostedService<ChildRunWatcher>();
+
+        // Lives here (not DataProcessing): it starts runs, which only this module owns.
+        builder.Services.AddSingleton<ITaskHandler, WorkflowCallHandler>();
     }
 
     public static void MapEndpoints(WebApplication app)

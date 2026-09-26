@@ -12,7 +12,7 @@ public static class NodeCatalog
     {
         "http.request", "data.csv.read", "data.json.read", "data.validate", "data.filter",
         "data.transform", "data.aggregate", "data.sort", "data.limit", "data.dedupe",
-        "data.join", "data.profile", "trigger.payload", "data.output"
+        "data.join", "data.profile", "trigger.payload", "workflow.call", "data.output"
     };
 
     private static readonly HashSet<string> FilterOperators = new(StringComparer.OrdinalIgnoreCase)
@@ -367,6 +367,25 @@ public static class NodeCatalog
                 case "trigger.payload":
                     if (root.TryGetProperty("rootPath", out var trp) && trp.ValueKind != JsonValueKind.String)
                         errors.Add($"Node '{nodeId}' 'rootPath' must be a string like 'items' (leave it out to parse the whole payload)");
+                    break;
+
+                case "workflow.call":
+                    if (!root.TryGetProperty("targetWorkflowId", out var target)
+                        || target.ValueKind != JsonValueKind.String
+                        || !Guid.TryParse(target.GetString(), out _))
+                        errors.Add($"Node '{nodeId}' requires 'targetWorkflowId' (the target workflow's GUID)");
+                    if (root.TryGetProperty("mode", out var callMode) && callMode.ValueKind == JsonValueKind.String
+                        && !callMode.GetString()!.Equals("wait", StringComparison.OrdinalIgnoreCase)
+                        && !callMode.GetString()!.Equals("fireAndForget", StringComparison.OrdinalIgnoreCase))
+                        errors.Add($"Node '{nodeId}' 'mode' must be 'wait' or 'fireAndForget'");
+                    if (root.TryGetProperty("timeoutSeconds", out var callTimeout)
+                        && (callTimeout.ValueKind != JsonValueKind.Number || !callTimeout.TryGetInt32(out var seconds)
+                            || seconds < 5 || seconds > 110))
+                        errors.Add($"Node '{nodeId}' 'timeoutSeconds' must be a number between 5 and 110");
+                    if (root.TryGetProperty("payload", out var payload)
+                        && payload.ValueKind != JsonValueKind.Object
+                        && payload.ValueKind != JsonValueKind.Null)
+                        errors.Add($"Node '{nodeId}' 'payload' must be a JSON object");
                     break;
 
                 case "data.output":

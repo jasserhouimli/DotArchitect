@@ -1,10 +1,12 @@
 using System.Text.Json;
 using Reflow.Infrastructure.Data;
 using Reflow.Infrastructure.Events;
+using Reflow.Infrastructure.Expressions;
 using Reflow.Infrastructure.Snapshots;
 using Reflow.Modules.DataProcessing;
 using Reflow.Modules.WorkflowExecution.Domain;
 using Reflow.Modules.WorkflowExecution.Persistence;
+using Reflow.Modules.WorkflowExecution.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -18,11 +20,13 @@ public class WorkflowWorker : BackgroundService
     public static readonly TimeSpan TaskTimeout = TimeSpan.FromSeconds(120);
 
     private readonly IServiceProvider _services;
+    private readonly WorkerWakeup _wakeup;
     private readonly ILogger<WorkflowWorker> _logger;
 
-    public WorkflowWorker(IServiceProvider services, ILogger<WorkflowWorker> logger)
+    public WorkflowWorker(IServiceProvider services, WorkerWakeup wakeup, ILogger<WorkflowWorker> logger)
     {
         _services = services;
+        _wakeup = wakeup;
         _logger = logger;
     }
 
@@ -32,7 +36,8 @@ public class WorkflowWorker : BackgroundService
 
         try
         {
-            await RecoverInterruptedTasks(stoppingToken);
+            if (await RecoverInterruptedTasks(stoppingToken))
+                _wakeup.Pulse();
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -48,7 +53,12 @@ public class WorkflowWorker : BackgroundService
         {
             try
             {
-                await ProcessBatch(stoppingToken);
+                // Pulse on progress so newly-unblocked tasks start immediately
+                // instead of waiting out the poll interval. The poll below stays
+                // as the correctness net: retry timers, missed pulses, anything
+                // the signal path doesn't cover.
+                if (await ProcessBatch(stoppingToken))
+                    _wakeup.Pulse();
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -61,7 +71,7 @@ public class WorkflowWorker : BackgroundService
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                await _wakeup.WaitAsync(TimeSpan.FromSeconds(2), stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -70,7 +80,7 @@ public class WorkflowWorker : BackgroundService
         }
     }
 
-    private async Task RecoverInterruptedTasks(CancellationToken ct)
+    private async Task<bool> RecoverInterruptedTasks(CancellationToken ct)
     {
         using var scope = _services.CreateScope();
         var execDb = scope.ServiceProvider.GetRequiredService<WorkflowExecutionDbContext>();
@@ -109,9 +119,11 @@ public class WorkflowWorker : BackgroundService
             await execDb.SaveChangesAsync(ct);
             _logger.LogInformation("Requeued {Count} interrupted tasks", interrupted.Count);
         }
+
+        return interrupted.Count > 0;
     }
 
-    private async Task ProcessBatch(CancellationToken ct)
+    private async Task<bool> ProcessBatch(CancellationToken ct)
     {
         using var scope = _services.CreateScope();
         var execDb = scope.ServiceProvider.GetRequiredService<WorkflowExecutionDbContext>();
@@ -126,6 +138,7 @@ public class WorkflowWorker : BackgroundService
             .Take(5)
             .ToListAsync(ct);
 
+        var progress = false;
         foreach (var id in candidateIds)
         {
             if (ct.IsCancellationRequested) break;
@@ -135,6 +148,7 @@ public class WorkflowWorker : BackgroundService
                 new object[] { id }, ct);
 
             if (claimed == 0) continue;
+            progress = true;
 
             try
             {
@@ -149,6 +163,8 @@ public class WorkflowWorker : BackgroundService
                 _logger.LogError(ex, "Task {TaskId} execution crashed", id);
             }
         }
+
+        return progress;
     }
 
     private async Task ExecuteTask(Guid taskId, CancellationToken ct)
@@ -223,14 +239,23 @@ public class WorkflowWorker : BackgroundService
         await execDb.SaveChangesAsync(ct);
 
         TaskExecutionResult result;
-        if (!registry.TryGet(task.NodeType, out var handler) || handler is null)
+        ITaskHandler? handler = null;
+        var expression = ExpressionResolver.ResolveConfigJson(
+            task.ConfigJson,
+            new ExpressionContext(run.TriggerKind, run.TriggerName, run.TriggerPayloadJson, run.Id, run.VersionNumber));
+        if (!expression.Ok)
+        {
+            // Deterministic config error: fail fast without consuming retries.
+            result = new TaskExecutionResult(false, expression.ValueOrError, null, null);
+        }
+        else if (!registry.TryGet(task.NodeType, out handler) || handler is null)
         {
             result = new TaskExecutionResult(false, $"No handler for type {task.NodeType}", null, null);
         }
         else
         {
             var inputs = await LoadPredecessorOutputs(run, task.NodeId, execDb, ct);
-            var context = new TaskExecutionContext(run.Id, task.Id, task.NodeId, task.NodeType, task.ConfigJson, inputs, run.WorkflowId, run.TriggerPayloadJson);
+            var context = new TaskExecutionContext(run.Id, task.Id, task.NodeId, task.NodeType, expression.ValueOrError, inputs, run.WorkflowId, run.TriggerPayloadJson);
 
             using var taskCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             taskCts.CancelAfter(TaskTimeout);
@@ -255,6 +280,30 @@ public class WorkflowWorker : BackgroundService
         attempt.CompletedAt = DateTime.UtcNow;
         attempt.Error = result.Error;
         attempt.Log = result.Log;
+
+        if (result.WaitForChildRunId is Guid waitingOn)
+        {
+            // Suspension, not completion: park the task as Waiting. The child
+            // watcher re-queues it once the child run finishes; the worker
+            // thread is never blocked. The attempt is informational only.
+            attempt.Status = TaskRunStatus.Completed;
+            task.Status = TaskRunStatus.Waiting;
+            task.WaitingOnRunId = waitingOn;
+            task.Error = null;
+            var waitLog = new ExecutionLog
+            {
+                Id = Guid.NewGuid(), WorkflowRunId = run.Id, TaskRunId = task.Id,
+                Message = result.Log ?? $"Task {task.NodeId} suspended", Level = "Info"
+            };
+            execDb.ExecutionLogs.Add(waitLog);
+            await execDb.SaveChangesAsync(ct);
+            await Fire(c => bus.PublishAsync(new LogRecordedEvent(run.Id,
+                new LogEventData(waitLog.Id, waitLog.TaskRunId, waitLog.Message, waitLog.Level, waitLog.Timestamp)), c));
+            await Fire(c => bus.PublishAsync(new TaskChangedEvent(run.Id, ToTaskEvent(task, attemptNumber)), c));
+            await Fire(c => PublishRunProgressAsync(run.Id, c));
+            _wakeup.Pulse();
+            return;
+        }
 
         if (result.IsSuccess)
         {

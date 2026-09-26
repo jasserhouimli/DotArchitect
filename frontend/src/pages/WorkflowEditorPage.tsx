@@ -7,27 +7,32 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NodeConfigForm, defaultConfig, parseConfig } from "@/components/NodeConfigForm"
+import { NodeTester } from "@/components/NodeTester"
 import { NotificationsBell } from "@/components/NotificationsBell"
+import { NotificationToasts } from "@/components/NotificationToasts"
 import { AlertsTab } from "@/pages/AlertsTab"
 import { TriggersTab } from "@/pages/TriggersTab"
 import { subscribeToRun } from "@/api/realtime"
 
 const NODE_TYPES = [
-  { type: "data.csv.read", label: "CSV Read", color: "#10b981" },
-  { type: "data.json.read", label: "JSON Read", color: "#14b8a6" },
-  { type: "http.request", label: "HTTP Request", color: "#3b82f6" },
-  { type: "data.validate", label: "Validate", color: "#f59e0b" },
-  { type: "data.filter", label: "Filter", color: "#8b5cf6" },
-  { type: "data.sort", label: "Sort", color: "#f97316" },
-  { type: "data.limit", label: "Limit", color: "#78716c" },
-  { type: "data.transform", label: "Transform", color: "#ec4899" },
-  { type: "data.dedupe", label: "Dedupe", color: "#84cc16" },
-  { type: "data.join", label: "Join", color: "#d946ef" },
-  { type: "data.aggregate", label: "Aggregate", color: "#06b6d4" },
-  { type: "data.profile", label: "Profile", color: "#6366f1" },
-  { type: "trigger.payload", label: "Trigger Payload", color: "#0d9488" },
-  { type: "data.output", label: "Output", color: "#64748b" },
+  { type: "data.csv.read", label: "CSV Read", color: "#10b981", group: "Sources", blurb: "Parse pasted CSV or an uploaded file" },
+  { type: "data.json.read", label: "JSON Read", color: "#14b8a6", group: "Sources", blurb: "Parse JSON text, files, or upstream columns" },
+  { type: "http.request", label: "HTTP Request", color: "#3b82f6", group: "Sources", blurb: "GET JSON from an HTTPS API" },
+  { type: "trigger.payload", label: "Trigger Payload", color: "#0d9488", group: "Sources", blurb: "Rows from the schedule/webhook payload" },
+  { type: "data.validate", label: "Validate", color: "#f59e0b", group: "Cleaning", blurb: "Reject rows failing quality rules" },
+  { type: "data.filter", label: "Filter", color: "#8b5cf6", group: "Cleaning", blurb: "Keep rows matching a condition" },
+  { type: "data.dedupe", label: "Dedupe", color: "#84cc16", group: "Cleaning", blurb: "Drop duplicate rows" },
+  { type: "data.transform", label: "Transform", color: "#ec4899", group: "Shaping", blurb: "Rename, select, fill, round, concat" },
+  { type: "data.sort", label: "Sort", color: "#f97316", group: "Shaping", blurb: "Order rows by columns" },
+  { type: "data.limit", label: "Limit", color: "#78716c", group: "Shaping", blurb: "Take a slice of rows" },
+  { type: "data.join", label: "Join", color: "#d946ef", group: "Shaping", blurb: "Combine two inputs on keys" },
+  { type: "data.aggregate", label: "Aggregate", color: "#06b6d4", group: "Shaping", blurb: "Group rows and summarize" },
+  { type: "data.profile", label: "Profile", color: "#6366f1", group: "Shaping", blurb: "Per-column statistics" },
+  { type: "workflow.call", label: "Call Workflow", color: "#7c3aed", group: "Flow", blurb: "Start another workflow as a child run" },
+  { type: "data.output", label: "Output", color: "#64748b", group: "Flow", blurb: "Save the downloadable result" },
 ]
+
+const NODE_GROUPS = ["Sources", "Cleaning", "Shaping", "Flow"]
 
 const NODE_W = 144
 const NODE_H = 56
@@ -41,7 +46,7 @@ interface WorkflowEditorProps {
 function taskBadge(status: number) {
   if (status === 3) return "bg-green-100 text-green-700"
   if (status === 4) return "bg-red-100 text-red-700"
-  if (status === 2 || status === 1 || status === 5) return "bg-blue-100 text-blue-700"
+  if (status === 2 || status === 1 || status === 5 || status === 8) return "bg-blue-100 text-blue-700"
   if (status === 6 || status === 7) return "bg-gray-100 text-gray-600"
   return "bg-gray-100 text-gray-600"
 }
@@ -80,6 +85,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const marqueeRef = useRef<{ x0: number; y0: number; additive: boolean } | null>(null)
   const [view, setView] = useState({ x: 0, y: 0, k: 1 })
+  const [paletteQuery, setPaletteQuery] = useState("")
   const panRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ sx: number; sy: number; wx: number; wy: number; nodeId: string | null } | null>(null)
 
@@ -94,14 +100,13 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
   useEffect(() => { load() }, [load])
 
   const addNode = (type: string) => {
-    const id = `node-${Date.now()}`
-    const newNode: WorkflowNode = {
-      nodeId: id, nodeType: type, configJson: JSON.stringify(defaultConfig(type)),
-      label: NODE_TYPES.find(n => n.type === type)?.label || type,
-      positionX: 200 + Math.random() * 200, positionY: 100 + Math.random() * 200
-    }
-    setNodes(prev => [...prev, newNode])
-    setSelectedNodes([id])
+    if (isArchived()) return
+    // Place at the center of the visible viewport, nudged so repeated adds cascade.
+    const rect = canvasRef.current?.getBoundingClientRect()
+    const cx = rect ? (rect.left + rect.width / 2 - view.x) / view.k : 200
+    const cy = rect ? (rect.top + rect.height / 2 - view.y) / view.k : 100
+    const nudge = (nodes.length % 5) * 24
+    addNodeAt(type, cx + nudge, cy + nudge)
   }
 
   const removeNodes = (ids: string[]) => {
@@ -130,6 +135,81 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
   const canvasPoint = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect()
     return { x: (clientX - rect.left - view.x) / view.k, y: (clientY - rect.top - view.y) / view.k }
+  }
+
+  /** Layered layout: depth = longest path from any root; layers flow left to right. */
+  const computeLayoutPositions = () => {
+    const preds = new Map<string, string[]>()
+    nodes.forEach(n => preds.set(n.nodeId, []))
+    edges.forEach(e => {
+      if (preds.has(e.targetNodeId) && preds.has(e.sourceNodeId))
+        preds.get(e.targetNodeId)!.push(e.sourceNodeId)
+    })
+    const depth = new Map<string, number>()
+    const visit = (id: string, stack: Set<string>): number => {
+      const known = depth.get(id)
+      if (known !== undefined) return known
+      if (stack.has(id)) return 0
+      stack.add(id)
+      const d = (preds.get(id) ?? []).reduce((m, p) => Math.max(m, visit(p, stack) + 1), 0)
+      stack.delete(id)
+      depth.set(id, d)
+      return d
+    }
+    nodes.forEach(n => visit(n.nodeId, new Set()))
+    const layers = new Map<number, WorkflowNode[]>()
+    nodes.forEach(n => {
+      const d = depth.get(n.nodeId) ?? 0
+      if (!layers.has(d)) layers.set(d, [])
+      layers.get(d)!.push(n)
+    })
+    const X_GAP = NODE_W + 120, Y_GAP = NODE_H + 40
+    const maxRows = Math.max(1, ...[...layers.values()].map(l => l.length))
+    const pos = new Map<string, { x: number; y: number }>()
+    ;[...layers.entries()].sort((a, b) => a[0] - b[0]).forEach(([d, list]) => {
+      list.forEach((n, i) => pos.set(n.nodeId, {
+        x: snap(60 + d * X_GAP),
+        y: snap(60 + ((maxRows - 1) * Y_GAP) / 2 + (i - (list.length - 1) / 2) * Y_GAP),
+      }))
+    })
+    return pos
+  }
+
+  const autoLayout = () => {
+    if (nodes.length === 0 || isArchived()) return
+    const pos = computeLayoutPositions()
+    setNodes(prev => prev.map(n => {
+      const p = pos.get(n.nodeId)
+      return p ? { ...n, positionX: p.x, positionY: p.y } : n
+    }))
+  }
+
+  const fitPositions = (positions: { x: number; y: number }[]) => {
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect || positions.length === 0) return
+    const minX = Math.min(...positions.map(p => p.x))
+    const minY = Math.min(...positions.map(p => p.y))
+    const maxX = Math.max(...positions.map(p => p.x + NODE_W))
+    const maxY = Math.max(...positions.map(p => p.y + NODE_H))
+    const pad = 60
+    const k = Math.min(1.5, Math.min(
+      rect.width / Math.max(1, maxX - minX + pad * 2),
+      rect.height / Math.max(1, maxY - minY + pad * 2)))
+    setView({ k, x: rect.width / 2 - ((minX + maxX) / 2) * k, y: rect.height / 2 - ((minY + maxY) / 2) * k })
+  }
+
+  const fitView = () => {
+    fitPositions(nodes.map(n => ({ x: n.positionX, y: n.positionY })))
+  }
+
+  const layoutAndFit = () => {
+    if (nodes.length === 0 || isArchived()) return
+    const pos = computeLayoutPositions()
+    setNodes(prev => prev.map(n => {
+      const p = pos.get(n.nodeId)
+      return p ? { ...n, positionX: p.x, positionY: p.y } : n
+    }))
+    fitPositions([...pos.values()])
   }
 
   const onNodeMouseDown = (nodeId: string, e: React.MouseEvent) => {
@@ -454,6 +534,16 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
 
   const isActive = (run: WorkflowRun) => run.status === 0 || run.status === 1
 
+  // Statuses move forward only (a retry re-queues explicitly via user action).
+  // A late snapshot must never clobber a terminal state delivered by a live
+  // event, and vice versa — snapshots and events race when runs finish fast.
+  const TERMINAL_TASK = new Set([3, 4, 6, 7]) // Completed, Failed, Cancelled, Skipped
+  const TERMINAL_RUN = new Set([2, 3, 4]) // Completed, Failed, Cancelled
+  const keepTask = (cur: TaskRun, next: TaskRun) =>
+    cur.id === next.id && TERMINAL_TASK.has(cur.status) && !TERMINAL_TASK.has(next.status)
+  const keepRun = (cur: WorkflowRun, next: WorkflowRun) =>
+    cur.id === next.id && TERMINAL_RUN.has(cur.status) && !TERMINAL_RUN.has(next.status)
+
   const loadRuns = useCallback(() => runs.list(workflowId).then(setWorkflowRuns).catch(() => {}), [workflowId])
   useEffect(() => { if (tab === "runs") loadRuns() }, [tab, loadRuns])
 
@@ -467,7 +557,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
       setTaskRuns(prev => {
         const i = prev.findIndex(x => x.id === t.id)
         if (i < 0) return [...prev, t]
-        if (prev[i] === t) return prev
+        if (prev[i] === t || keepTask(prev[i], t)) return prev
         const next = [...prev]
         next[i] = t
         return next
@@ -478,34 +568,46 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
       setLogs(prev => (prev.some(x => x.id === l.id) ? prev : [...prev, l]))
     }
 
-    // Snapshot first, then join for live updates, then refetch to close the gap.
+    // Snapshot first for fast paint, then join for live updates, then refetch:
+    // SignalR only delivers post-join events, so anything committed between
+    // the first snapshot and the join would otherwise be missed forever.
     const boot = async () => {
       const id = selectedRun.id
+      setTaskRuns([])
+      setLogs([])
       try {
         const [r, t, l] = await Promise.all([runs.get(id), runs.tasks(id), runs.logs(id)])
         if (!alive) return
-        setSelectedRun(r)
-        setTaskRuns(t)
-        setLogs(l)
+        setSelectedRun(prev => (prev && prev.id === id && keepRun(prev, r) ? prev : r))
+        t.forEach(applyTask)
+        l.forEach(applyLog)
       } catch { /* run may be gone; live events will correct */ }
       if (!alive) return
       try {
         unsubscribe = await subscribeToRun(id, {
           onRun: r => {
             if (!alive) return
-            setSelectedRun(r)
-            setWorkflowRuns(prev => prev.map(x => (x.id === r.id ? r : x)))
+            setSelectedRun(prev => (prev && prev.id === r.id && keepRun(prev, r) ? prev : r))
+            setWorkflowRuns(prev => prev.map(x => (x.id === r.id && keepRun(x, r) ? x : r)))
             if (!isActive(r)) loadRuns()
           },
           onTask: applyTask,
           onLog: applyLog,
           onReconnect: () => {
             if (!alive) return
-            runs.get(id).then(setSelectedRun).catch(() => {})
-            runs.tasks(id).then(setTaskRuns).catch(() => {})
-            runs.logs(id).then(setLogs).catch(() => {})
+            runs.get(id).then(r => setSelectedRun(prev => (prev && prev.id === r.id && keepRun(prev, r) ? prev : r))).catch(() => {})
+            runs.tasks(id).then(ts => ts.forEach(applyTask)).catch(() => {})
+            runs.logs(id).then(ls => ls.forEach(applyLog)).catch(() => {})
           },
         })
+        // Join acked: close the snapshot-to-join gap.
+        try {
+          const [r, t, l] = await Promise.all([runs.get(id), runs.tasks(id), runs.logs(id)])
+          if (!alive) return
+          setSelectedRun(prev => (prev && prev.id === id && keepRun(prev, r) ? prev : r))
+          t.forEach(applyTask)
+          l.forEach(applyLog)
+        } catch { /* live events still apply on top */ }
         if (alive) setLive(true)
       } catch {
         // Hub unreachable: fall back to one snapshot; user can switch runs to retry.
@@ -590,6 +692,7 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
           <Button size="sm" variant="outline" onClick={handleRun} disabled={archived}>Run</Button>
           <Button size="sm" variant="ghost" onClick={archive} disabled={archived}>Archive</Button>
           <NotificationsBell />
+          <NotificationToasts />
           <Button variant="ghost" size="sm" onClick={onLogout}>Logout</Button>
         </div>
       </div>
@@ -623,17 +726,35 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
 
       {tab === "editor" ? (
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-48 border-r p-2 space-y-1 overflow-y-auto">
-          <p className="text-xs font-medium text-muted-foreground mb-2 px-2">Node Types</p>
-          {NODE_TYPES.map(nt => (
-            <button key={nt.type} disabled={archived} className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors disabled:opacity-50"
-              onClick={() => addNode(nt.type)}>
-              <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: nt.color }} />
-              {nt.label}
-            </button>
-          ))}
+        <div className="w-52 border-r p-2 space-y-1 overflow-y-auto">
+          <p className="text-xs font-medium text-muted-foreground mb-1 px-2">Nodes</p>
+          <div className="px-1 pb-1">
+            <Input placeholder="Search nodes…" value={paletteQuery} onChange={e => setPaletteQuery(e.target.value)} className="h-7 text-xs" />
+          </div>
+          {NODE_GROUPS.map(g => {
+            const items = NODE_TYPES.filter(nt =>
+              nt.group === g &&
+              (paletteQuery.trim() === "" ||
+                nt.label.toLowerCase().includes(paletteQuery.toLowerCase()) ||
+                nt.blurb.toLowerCase().includes(paletteQuery.toLowerCase()) ||
+                nt.type.includes(paletteQuery.toLowerCase())));
+            if (items.length === 0) return null;
+            return (
+              <div key={g}>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground px-2 pt-1">{g}</p>
+                {items.map(nt => (
+                  <button key={nt.type} disabled={archived} title={nt.blurb}
+                    className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors disabled:opacity-50"
+                    onClick={() => addNode(nt.type)}>
+                    <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: nt.color }} />
+                    {nt.label}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
           <p className="text-[11px] text-muted-foreground px-2 pt-2 leading-relaxed">
-            Right-click canvas to add here · drag empty space to pan · scroll to zoom · Shift+click or Shift+drag to select many · Del removes selection
+            Click to add at viewport center · right-click canvas to add here · drag empty space to pan · scroll to zoom · Shift+click or Shift+drag to select many · Del removes selection
           </p>
         </div>
 
@@ -747,6 +868,8 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
           )}
 
           <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-white border rounded shadow px-1 py-0.5 text-xs">
+            <button className="px-1.5 hover:bg-accent rounded" onClick={layoutAndFit} title="Auto-arrange nodes left-to-right and fit to screen">Layout</button>
+            <button className="px-1.5 hover:bg-accent rounded" onClick={fitView} title="Zoom to fit all nodes">Fit</button>
             <button className="px-1.5 hover:bg-accent rounded" onClick={() => zoomBy(1 / 1.2)} title="Zoom out">−</button>
             <span className="w-10 text-center text-muted-foreground">{Math.round(view.k * 100)}%</span>
             <button className="px-1.5 hover:bg-accent rounded" onClick={() => zoomBy(1.2)} title="Zoom in">+</button>
@@ -825,6 +948,9 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground font-medium">Configuration</label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Tip: any text field accepts {"{{ trigger.body.path }}"}, {"{{ trigger.kind }}"} or {"{{ run.id }}"} — resolved when the run executes.
+                    </p>
                     <div className="mt-1">
                       <NodeConfigForm
                         key={selectedNode}
@@ -834,6 +960,12 @@ export function WorkflowEditorPage({ workflowId, onBack, onLogout }: WorkflowEdi
                         onChange={c => updateNodeConfig(selectedNode, c)}
                       />
                     </div>
+                    <NodeTester
+                      key={`test-${selectedNode}`}
+                      workflowId={workflowId}
+                      nodeId={selectedNode}
+                      edges={edges}
+                    />
                   </div>
                   <p className="text-xs text-muted-foreground">
                     To connect: drag from this node's <b>right port</b> ● to another node's left port.

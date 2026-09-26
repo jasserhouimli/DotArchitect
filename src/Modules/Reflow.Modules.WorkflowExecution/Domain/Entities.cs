@@ -1,7 +1,7 @@
 namespace Reflow.Modules.WorkflowExecution.Domain;
 
 public enum WorkflowRunStatus { Queued = 0, Running = 1, Completed = 2, Failed = 3, Cancelled = 4 }
-public enum TaskRunStatus { Pending = 0, Ready = 1, Running = 2, Completed = 3, Failed = 4, RetryScheduled = 5, Cancelled = 6, Skipped = 7 }
+public enum TaskRunStatus { Pending = 0, Ready = 1, Running = 2, Completed = 3, Failed = 4, RetryScheduled = 5, Cancelled = 6, Skipped = 7, Waiting = 8 }
 
 public class WorkflowRun
 {
@@ -35,6 +35,8 @@ public class TaskRun
     public string? ConfigJson { get; set; }
     public string? OutputJson { get; set; }
     public DateTime? NotBefore { get; set; }
+    /// <summary>Child run this task is suspended on (workflow.call wait mode).</summary>
+    public Guid? WaitingOnRunId { get; set; }
     public uint RowVersion { get; set; }
 }
 

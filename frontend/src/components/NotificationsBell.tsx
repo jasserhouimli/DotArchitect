@@ -15,49 +15,55 @@ export function NotificationsBell() {
   const [items, setItems] = useState<NotificationItem[]>([])
   const [open, setOpen] = useState(false)
 
-  const refresh = () => {
+  // The badge always converges to server truth: every mutation reconciles
+  // instead of blindly +/-1, so duplicate/delayed events can never inflate it.
+  const syncCount = () => {
     notifications.unreadCount().then(setUnread).catch(() => {})
-    if (open) {
-      notifications.list().then(setItems).catch(() => {})
-    }
   }
 
   useEffect(() => {
-    refresh()
+    syncCount()
+    let cancelled = false
     let unsubscribe: (() => void) | null = null
     subscribeToNotifications(
       n => {
+        if (cancelled) return
         setItems(prev => (prev.some(x => x.id === n.id) ? prev : [n, ...prev]))
-        setUnread(u => u + 1)
+        syncCount()
       },
-      refresh,
+      () => {
+        if (!cancelled) syncCount()
+      },
     ).then(u => {
-      unsubscribe = u
+      if (cancelled) u()
+      else unsubscribe = u
     }).catch(() => {})
     return () => {
+      cancelled = true
       unsubscribe?.()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open ])
+  }, [])
 
   const toggle = async () => {
     const next = !open
     setOpen(next)
     if (next) {
       notifications.list().then(setItems).catch(() => {})
+      syncCount()
     }
   }
 
   const markRead = async (id: string) => {
-    await notifications.markRead(id).catch(() => {})
     setItems(prev => prev.map(x => (x.id === id ? { ...x, isRead: true } : x)))
-    setUnread(u => Math.max(0, u - 1))
+    await notifications.markRead(id).catch(() => {})
+    syncCount()
   }
 
   const markAll = async () => {
-    await notifications.markAllRead().catch(() => {})
     setItems(prev => prev.map(x => ({ ...x, isRead: true })))
     setUnread(0)
+    await notifications.markAllRead().catch(() => {})
+    syncCount()
   }
 
   return (

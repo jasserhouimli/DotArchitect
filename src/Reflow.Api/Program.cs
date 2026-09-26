@@ -150,7 +150,29 @@ TriggersModule.MapEndpoints(app);
 
 app.MapHub<RunHub>("/hubs/runs");
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+// Liveness + Postgres reachability. No auth, no rate limiting: supervisors,
+// CI and dev scripts all poll this to know the backend is truly ready.
+app.MapGet("/health", async (IConfiguration config, CancellationToken ct) =>
+{
+    var timestamp = DateTime.UtcNow;
+    try
+    {
+        var connectionString = config.GetConnectionString("Reflow");
+        await using var conn = new Npgsql.NpgsqlConnection(connectionString);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        await conn.OpenAsync(timeout.Token);
+        await using var cmd = new Npgsql.NpgsqlCommand("SELECT 1", conn);
+        await cmd.ExecuteScalarAsync(timeout.Token);
+        return Results.Ok(new { status = "healthy", database = "reachable", timestamp });
+    }
+    catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+    {
+        return Results.Json(
+            new { status = "degraded", database = "unreachable", timestamp },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
 
 app.Run();
 

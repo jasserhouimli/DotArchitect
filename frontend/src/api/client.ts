@@ -106,7 +106,16 @@ export const workflows = {
   },
   listFiles: (id: string) => request<WorkflowFile[]>(`/workflows/${id}/files`),
   deleteFile: (id: string, fileId: string) => request<void>(`/workflows/${id}/files/${fileId}`, { method: 'DELETE' }),
+  testNode: (id: string, nodeId: string, body: { samplePayload?: unknown; inputs?: { columns: string[]; rows: (string | null)[][] }[] }) =>
+    request<TestNodeResult>(`/workflows/${id}/nodes/${encodeURIComponent(nodeId)}/test`, { method: 'POST', body: JSON.stringify(body) }),
 };
+
+export interface TestNodeResult {
+  success: boolean; nodeType: string;
+  columns: string[] | null; rows: (string | null)[][] | null; totalRows: number;
+  log: string | null; error: string | null;
+}
+
 
 export interface WorkflowFile {
   fileId: string; fileName: string; size: number; rows: number; columns: string[]; uploadedAt: string;
@@ -201,4 +210,4 @@ export const triggers = {
 export const artifactUrl = (runId: string, nodeId: string) => `/api/v1/runs/${runId}/artifacts/${encodeURIComponent(nodeId)}`;
 
 export const RUN_STATUSES = ['Queued', 'Running', 'Completed', 'Failed', 'Cancelled'];
-export const TASK_STATUSES = ['Pending', 'Ready', 'Running', 'Completed', 'Failed', 'RetryScheduled', 'Cancelled', 'Skipped'];
+export const TASK_STATUSES = ['Pending', 'Ready', 'Running', 'Completed', 'Failed', 'RetryScheduled', 'Cancelled', 'Skipped', 'Waiting'];

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react"
 import { workflows, type Workflow } from "@/api/client"
+import { TEMPLATES } from "@/templates"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { NotificationsBell } from "@/components/NotificationsBell"
+import { NotificationToasts } from "@/components/NotificationToasts"
 
 interface DashboardPageProps {
   user: { id: string; email: string; displayName: string }
@@ -14,6 +16,7 @@ interface DashboardPageProps {
 export function DashboardPage({ user, onSelectWorkflow, onLogout }: DashboardPageProps) {
   const [list, setList] = useState<Workflow[]>([])
   const [newName, setNewName] = useState("")
+  const [templateIdx, setTemplateIdx] = useState("")
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,6 +28,20 @@ export function DashboardPage({ user, onSelectWorkflow, onLogout }: DashboardPag
     const id = await workflows.create({ name: newName })
     setList(prev => [{ id, name: newName, description: null, status: "Draft", currentVersion: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, ...prev])
     setNewName("")
+  }
+
+  const createFromTemplate = async () => {
+    if (templateIdx === "") return
+    const t = TEMPLATES[parseInt(templateIdx, 10)]
+    const id = await workflows.create({ name: t.name })
+    await workflows.update(id, {
+      nodes: t.nodes.map(n => ({
+        nodeId: n.nodeId, nodeType: n.nodeType, configJson: JSON.stringify(n.config),
+        label: n.label, positionX: n.positionX, positionY: n.positionY,
+      })),
+      edges: t.edges.map(e => ({ sourceNodeId: e.sourceNodeId, targetNodeId: e.targetNodeId })),
+    })
+    onSelectWorkflow(id)
   }
 
   const remove = async (id: string, e: React.MouseEvent) => {
@@ -40,12 +57,21 @@ export function DashboardPage({ user, onSelectWorkflow, onLogout }: DashboardPag
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">{user.email}</span>
           <NotificationsBell />
+          <NotificationToasts />
           <Button variant="ghost" size="sm" onClick={onLogout}>Logout</Button>
         </div>
       </div>
       <div className="flex gap-2 mb-6">
         <Input placeholder="New workflow name" value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()} />
         <Button onClick={create}>Create</Button>
+      </div>
+      <div className="flex gap-2 mb-6 items-center">
+        <select className="h-9 rounded-md border border-input bg-transparent px-3 text-sm flex-1"
+          value={templateIdx} onChange={e => setTemplateIdx(e.target.value)}>
+          <option value="">Start from a template…</option>
+          {TEMPLATES.map((t, i) => <option key={t.name} value={i}>{t.name} — {t.description}</option>)}
+        </select>
+        <Button variant="outline" disabled={templateIdx === ""} onClick={createFromTemplate}>Use template</Button>
       </div>
       {loading ? <p>Loading...</p> : (
         <div className="grid gap-4">

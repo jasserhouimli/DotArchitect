@@ -4,11 +4,12 @@ using Reflow.Infrastructure.Runs;
 using Reflow.Infrastructure.Snapshots;
 using Reflow.Modules.WorkflowExecution.Domain;
 using Reflow.Modules.WorkflowExecution.Persistence;
+using Reflow.Modules.WorkflowExecution.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Reflow.Modules.WorkflowExecution.Features.StartWorkflowRun;
 
-public class WorkflowRunStarter(IWorkflowSnapshotProvider snapshots, WorkflowExecutionDbContext execDb)
+public class WorkflowRunStarter(IWorkflowSnapshotProvider snapshots, WorkflowExecutionDbContext execDb, WorkerWakeup wakeup)
     : IWorkflowRunStarter
 {
     public const int MaxTriggerPayloadChars = 512 * 1024;
@@ -21,7 +22,7 @@ public class WorkflowRunStarter(IWorkflowSnapshotProvider snapshots, WorkflowExe
 
         var definition = snapshot.Value;
         var kind = trigger?.Kind ?? "manual";
-        if (kind != "manual" && kind != "schedule" && kind != "webhook")
+        if (kind != "manual" && kind != "schedule" && kind != "webhook" && kind != "workflow")
             return Result<Guid>.Failure($"Unknown trigger kind: {kind}", 400);
 
         string? payload = trigger?.PayloadJson;
@@ -86,6 +87,7 @@ public class WorkflowRunStarter(IWorkflowSnapshotProvider snapshots, WorkflowExe
         run.Status = WorkflowRunStatus.Running;
         run.StartedAt = DateTime.UtcNow;
         await execDb.SaveChangesAsync(ct);
+        wakeup.Pulse();
 
         return Result<Guid>.Success(run.Id, 201);
     }

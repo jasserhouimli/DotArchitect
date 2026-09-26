@@ -24,7 +24,13 @@ public record TaskExecutionResult(
     string? Error,
     string? OutputJson,
     string? Log,
-    bool IsRetryable = false);
+    bool IsRetryable = false,
+    /// <summary>
+    /// Set when the task suspends instead of finishing (e.g. workflow.call
+    /// waiting on a child run). The worker parks the task as Waiting; it is
+    /// re-executed once woken, never retried as a failure.
+    /// </summary>
+    Guid? WaitForChildRunId = null);
 
 public interface ITaskHandler
 {

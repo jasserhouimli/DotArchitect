@@ -29,7 +29,7 @@ Reflow is a visual workflow orchestration platform for defining, validating, ver
 |--------|---------------|--------|
 | Identity | User registration, login, JWT auth, token refresh | Done |
 | WorkflowDesign | Workflow CRUD, nodes/edges, graph validation, publish/versioning, archive, file uploads | Done |
-| DataProcessing | Task handlers (14 node types), node config schemas, shared data kernel in Infrastructure | Done |
+| DataProcessing | Task handlers (15 node types), node config schemas, shared data kernel in Infrastructure | Done |
 | WorkflowExecution | Runs, task runs, attempts, logs, retry, cancel, artifacts, worker | Done |
 | Notifications | Per-workflow alert rules, inbox, webhooks (event-driven, owns its data) | Done |
 | Triggers | Cron schedules + inbound webhooks, payload-driven starts, own schema | Done |
@@ -180,7 +180,15 @@ frontend/
 | `data.aggregate` | `groupBy`, `operations` (count/countDistinct/sum/avg/min/max/median) | Group and summarize |
 | `data.profile` | `columns` (empty = all) | One stats row per column (count, nulls, distinct, min/max/mean) |
 | `data.output` | `format` (json/csv), `fileName`, `delimiter`, `includeHeader` | Save downloadable artifact |
-| `trigger.payload` | `rootPath` (e.g. `order.id`) | Parse the schedule/webhook payload that started the run |
+| `trigger.payload` | `rootPath` (e.g. `order.id`) | Parse the schedule/webhook payload that started the run (optional convenience) |
+| `workflow.call` | `targetWorkflowId`, `mode` (wait/fireAndForget), `timeoutSeconds`, `payload` | Start another workflow as a child run; wait mode suspends without blocking the worker, cycles rejected at publish |
+
+Any text field in any node config accepts `{{ expressions }}`: `trigger.kind`,
+`trigger.name`, `trigger.body.path.to.value`, `run.id`, `run.version`. A lone
+expression keeps its JSON type (numbers stay numbers); embedded ones stringify.
+`\{{` escapes a literal. Bad expressions fail validation before publish, and
+missing values fail the task with a clear error — no `trigger.payload` node
+required.
 
 ## File uploads
 

@@ -87,6 +87,10 @@ public class ReflowApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                     "ADD COLUMN IF NOT EXISTS \"TriggerName\" character varying(200) NULL, " +
                     "ADD COLUMN IF NOT EXISTS \"TriggerPayloadJson\" text NULL;", conn);
                 await cmd.ExecuteNonQueryAsync();
+                await using var tasks = new NpgsqlCommand(
+                    "ALTER TABLE workflow_execution.\"TaskRuns\" " +
+                    "ADD COLUMN IF NOT EXISTS \"WaitingOnRunId\" uuid NULL;", conn);
+                await tasks.ExecuteNonQueryAsync();
             }
 
             _initialized = true;

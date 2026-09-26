@@ -1,3 +1,4 @@
+using Reflow.Infrastructure.Expressions;
 using Reflow.Modules.DataProcessing;
 using Reflow.Modules.WorkflowDesign.Domain;
 
@@ -52,6 +53,7 @@ public static class WorkflowValidator
             }
 
             errors.AddRange(NodeCatalog.ValidateNodeConfig(node.NodeId, node.NodeType, node.ConfigJson, warnings));
+            errors.AddRange(ExpressionValidator.ValidateConfig(node.NodeId, node.ConfigJson));
         }
 
         var seenEdges = new HashSet<string>();

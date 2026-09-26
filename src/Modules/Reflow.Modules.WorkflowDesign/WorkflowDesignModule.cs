@@ -15,6 +15,7 @@ using Reflow.Modules.WorkflowDesign.Features.ValidateWorkflow;
 using Reflow.Modules.WorkflowDesign.Features.ArchiveWorkflow;
 using Reflow.Modules.WorkflowDesign.Features.Versions;
 using Reflow.Modules.WorkflowDesign.Features.Files;
+using Reflow.Modules.WorkflowDesign.Features.TestNode;
 
 namespace Reflow.Modules.WorkflowDesign;
 
@@ -45,6 +46,7 @@ public static class WorkflowDesignModule
         builder.Services.AddScoped<UploadWorkflowFileHandler>();
         builder.Services.AddScoped<ListWorkflowFilesHandler>();
         builder.Services.AddScoped<DeleteWorkflowFileHandler>();
+        builder.Services.AddScoped<TestNodeHandler>();
     }
 
     public static void MapEndpoints(WebApplication app)
@@ -60,5 +62,6 @@ public static class WorkflowDesignModule
         ListVersionsEndpoint.Map(app);
         GetVersionEndpoint.Map(app);
         WorkflowFilesEndpoint.Map(app);
+        TestNodeEndpoint.Map(app);
     }
 }
