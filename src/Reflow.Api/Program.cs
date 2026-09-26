@@ -3,12 +3,7 @@ using System.Threading.RateLimiting;
 using Reflow.Infrastructure;
 using Reflow.Infrastructure.Middleware;
 using Reflow.Infrastructure.Realtime;
-using Reflow.Modules.DataProcessing;
 using Reflow.Modules.Identity;
-using Reflow.Modules.Notifications;
-using Reflow.Modules.Triggers;
-using Reflow.Modules.WorkflowDesign;
-using Reflow.Modules.WorkflowExecution;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -28,11 +23,6 @@ builder.Host.UseSerilog();
 builder.Services.AddReflowInfrastructure();
 
 IdentityModule.Register(builder);
-WorkflowDesignModule.Register(builder);
-DataProcessingModule.Register(builder);
-WorkflowExecutionModule.Register(builder);
-NotificationsModule.Register(builder);
-TriggersModule.Register(builder);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -143,10 +133,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 IdentityModule.MapEndpoints(app);
-WorkflowDesignModule.MapEndpoints(app);
-WorkflowExecutionModule.MapEndpoints(app);
-NotificationsModule.MapEndpoints(app);
-TriggersModule.MapEndpoints(app);
 
 app.MapHub<RunHub>("/hubs/runs");
 

@@ -5,10 +5,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Reflow.Modules.Identity.Persistence;
-using Reflow.Modules.Notifications.Persistence;
-using Reflow.Modules.Triggers.Persistence;
-using Reflow.Modules.WorkflowDesign.Persistence;
-using Reflow.Modules.WorkflowExecution.Persistence;
 using Xunit;
 
 namespace Reflow.IntegrationTests;
@@ -64,34 +60,6 @@ public class ReflowApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             // per context instead, guarded by an existence check.
             using (var identity = new IdentityDbContext(Options<IdentityDbContext>()))
                 EnsureSchema(identity, "identity", "users");
-            using (var design = new WorkflowDesignDbContext(Options<WorkflowDesignDbContext>()))
-                EnsureSchema(design, "workflow_design", "Workflows");
-            using (var execution = new WorkflowExecutionDbContext(Options<WorkflowExecutionDbContext>()))
-                EnsureSchema(execution, "workflow_execution", "TaskRuns");
-            using (var notifications = new NotificationsDbContext(Options<NotificationsDbContext>()))
-            {
-                EnsureSchema(notifications, "notifications", "NotificationRules");
-                EnsureSchema(notifications, "notifications", "Notifications");
-            }
-            using (var triggers = new TriggersDbContext(Options<TriggersDbContext>()))
-                EnsureSchema(triggers, "triggers", "Triggers");
-
-            // NOTE: CreateTables() only runs for brand-new tables, so columns
-            // added to existing tables by later migrations need explicit alters.
-            await using (var conn = new NpgsqlConnection(TestConnectionString))
-            {
-                await conn.OpenAsync();
-                await using var cmd = new NpgsqlCommand(
-                    "ALTER TABLE workflow_execution.\"WorkflowRuns\" " +
-                    "ADD COLUMN IF NOT EXISTS \"TriggerKind\" character varying(20) NOT NULL DEFAULT '', " +
-                    "ADD COLUMN IF NOT EXISTS \"TriggerName\" character varying(200) NULL, " +
-                    "ADD COLUMN IF NOT EXISTS \"TriggerPayloadJson\" text NULL;", conn);
-                await cmd.ExecuteNonQueryAsync();
-                await using var tasks = new NpgsqlCommand(
-                    "ALTER TABLE workflow_execution.\"TaskRuns\" " +
-                    "ADD COLUMN IF NOT EXISTS \"WaitingOnRunId\" uuid NULL;", conn);
-                await tasks.ExecuteNonQueryAsync();
-            }
 
             _initialized = true;
         }

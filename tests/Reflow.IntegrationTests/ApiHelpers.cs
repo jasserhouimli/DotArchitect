@@ -39,38 +39,4 @@ public static class ApiHelpers
         var (client, _) = await LoginNewUserWithTokenAsync(factory);
         return client;
     }
-
-    public static async Task<Guid> CreateWorkflowAsync(HttpClient client, string name = "Test workflow")
-    {
-        var res = await client.PostAsJsonAsync("/api/v1/workflows", new { name });
-        res.EnsureSuccessStatusCode();
-        var body = await res.Content.ReadFromJsonAsync<JsonDocument>();
-        return body!.RootElement.GetProperty("id").GetGuid();
-    }
-
-    public static object Node(string nodeId, string nodeType, object config, double x = 50, double y = 50) =>
-        new
-        {
-            nodeId,
-            nodeType,
-            configJson = JsonSerializer.Serialize(config),
-            label = nodeId,
-            positionX = x,
-            positionY = y
-        };
-
-    public static async Task<JsonDocument> PollRunAsync(HttpClient client, Guid runId, TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        while (true)
-        {
-            var res = await client.GetAsync($"/api/v1/runs/{runId}");
-            res.EnsureSuccessStatusCode();
-            var body = (await res.Content.ReadFromJsonAsync<JsonDocument>())!;
-            var status = body.RootElement.GetProperty("status").GetInt32();
-            if (status is 2 or 3 or 4 || DateTime.UtcNow > deadline)
-                return body;
-            await Task.Delay(1000);
-        }
-    }
 }

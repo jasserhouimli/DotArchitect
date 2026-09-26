@@ -80,17 +80,4 @@ public class AuthTests
 
         Assert.Contains("@test.com", body!.RootElement.GetProperty("email").GetString());
     }
-
-    [Fact]
-    public async Task User_CannotSeeAnotherUsersWorkflow()
-    {
-        var alice = await ApiHelpers.LoginNewUserAsync(_factory);
-        var bob = await ApiHelpers.LoginNewUserAsync(_factory);
-
-        var workflowId = await ApiHelpers.CreateWorkflowAsync(alice);
-
-        var res = await bob.GetAsync($"/api/v1/workflows/{workflowId}");
-
-        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
-    }
 }
