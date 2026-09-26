@@ -2,7 +2,6 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Reflow.Infrastructure;
 using Reflow.Infrastructure.Middleware;
-using Reflow.Infrastructure.Realtime;
 using Reflow.Modules.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -133,8 +132,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 IdentityModule.MapEndpoints(app);
-
-app.MapHub<RunHub>("/hubs/runs");
 
 // Liveness + Postgres reachability. No auth, no rate limiting: supervisors,
 // CI and dev scripts all poll this to know the backend is truly ready.
